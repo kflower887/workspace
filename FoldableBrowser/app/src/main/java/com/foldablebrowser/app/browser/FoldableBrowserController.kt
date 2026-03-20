@@ -200,6 +200,9 @@ class FoldableBrowserController(private val context: Context) {
         webViews.forEach { it.stopLoading() }
     }
 
+    /** 현재 패널 목록 반환 (회전 시 재배치에 사용, WebView 재생성 없음) */
+    fun getPanels(): List<SyncScrollWebView> = webViews.toList()
+
     /**
      * 슬레이브 패널 URL 동기화 (마스터와 동일 URL 로드)
      */
