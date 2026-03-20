@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 3단 폴더블 아이콘: 화면이 세로로 3분할된 형태 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28dp"
+    android:height="28dp"
+    android:viewportWidth="28"
+    android:viewportHeight="28">
+
+    <!-- 왼쪽 패널 -->
+    <path
+        android:pathData="M1,4 Q1,2 3,2 L8,2 L8,26 L3,26 Q1,26 1,24 Z"
+        android:fillColor="#0066CC"/>
+
+    <!-- 중간 패널 -->
+    <path
+        android:pathData="M10,2 L18,2 L18,26 L10,26 Z"
+        android:fillColor="#3399FF"/>
+
+    <!-- 오른쪽 패널 -->
+    <path
+        android:pathData="M20,2 L25,2 Q27,2 27,4 L27,24 Q27,26 25,26 L20,26 Z"
+        android:fillColor="#66B2FF"/>
+
+    <!-- 힌지 1 -->
+    <rect
+        android:x="8.2"
+        android:y="2"
+        android:width="1.6"
+        android:height="24"
+        android:fillColor="#CCCCCC"/>
+
+    <!-- 힌지 2 -->
+    <rect
+        android:x="18.2"
+        android:y="2"
+        android:width="1.6"
+        android:height="24"
+        android:fillColor="#CCCCCC"/>
+
+    <!-- 콘텐츠 라인들 -->
+    <path
+        android:pathData="M2.5,8 L6.5,8 M11,7 L17,7 M21,6 L25.5,6"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"/>
+
+    <path
+        android:pathData="M2.5,12 L6.5,12 M11,11 L17,11 M21,10 L25.5,10"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"/>
+
+    <path
+        android:pathData="M2.5,16 L6.5,16 M11,15 L17,15 M21,14 L25.5,14"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"/>
+
+</vector>

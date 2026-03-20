@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">폴더블 브라우저</string>
+    <string name="address_hint">주소 또는 검색어 입력</string>
+    <string name="mode_single">일반</string>
+    <string name="mode_dual">2단 폴더블</string>
+    <string name="mode_triple">3단 폴더블</string>
+    <string name="new_tab">새 탭</string>
+    <string name="close_tab">탭 닫기</string>
+    <string name="back">뒤로</string>
+    <string name="forward">앞으로</string>
+    <string name="refresh">새로고침</string>
+    <string name="home">홈</string>
+    <string name="bookmark">북마크</string>
+    <string name="history">히스토리</string>
+    <string name="settings">설정</string>
+    <string name="menu">메뉴</string>
+    <string name="foldable_mode">폴더블 모드</string>
+    <string name="select_mode">브라우저 분할 모드 선택</string>
+    <string name="mode_single_desc">일반 스마트폰 모드</string>
+    <string name="mode_dual_desc">2단 폴더블 - 좌우 2분할 연속 스크롤</string>
+    <string name="mode_triple_desc">3단 폴더블 - 3분할 연속 스크롤</string>
+    <string name="default_url">https://www.google.com</string>
+</resources>

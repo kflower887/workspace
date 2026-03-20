@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 2단 폴더블 아이콘: 화면이 중간에서 세로로 나뉜 형태 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28dp"
+    android:height="28dp"
+    android:viewportWidth="28"
+    android:viewportHeight="28">
+
+    <!-- 왼쪽 패널 -->
+    <path
+        android:pathData="M2,4 Q2,2 4,2 L12,2 L12,26 L4,26 Q2,26 2,24 Z"
+        android:fillColor="#0066CC"
+        android:strokeColor="#0066CC"
+        android:strokeWidth="0.5"/>
+
+    <!-- 오른쪽 패널 -->
+    <path
+        android:pathData="M16,2 L24,2 Q26,2 26,4 L26,24 Q26,26 24,26 L16,26 Z"
+        android:fillColor="#3399FF"
+        android:strokeColor="#3399FF"
+        android:strokeWidth="0.5"/>
+
+    <!-- 중앙 힌지 -->
+    <rect
+        android:x="12.5"
+        android:y="2"
+        android:width="3"
+        android:height="24"
+        android:fillColor="#CCCCCC"/>
+
+    <!-- 스크롤 연결 화살표 (위) -->
+    <path
+        android:pathData="M6,9 L10,9 M18,7 L22,7"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"/>
+
+    <!-- 스크롤 연결 화살표 (아래) -->
+    <path
+        android:pathData="M6,13 L10,13 M18,11 L22,11"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"/>
+
+    <path
+        android:pathData="M6,17 L10,17 M18,15 L22,15"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"/>
+
+</vector>

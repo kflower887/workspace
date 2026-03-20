@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 단일 화면 모드 아이콘 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28dp"
+    android:height="28dp"
+    android:viewportWidth="28"
+    android:viewportHeight="28">
+
+    <path
+        android:pathData="M4,2 Q2,2 2,4 L2,24 Q2,26 4,26 L24,26 Q26,26 26,24 L26,4 Q26,2 24,2 Z"
+        android:fillColor="#0066CC"/>
+
+    <path
+        android:pathData="M5,8 L23,8 M5,12 L23,12 M5,16 L23,16 M5,20 L18,20"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"/>
+
+</vector>
