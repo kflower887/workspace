@@ -1,0 +1,16 @@
+# Gradle 캐시
+.gradle/
+build/
+app/build/
+
+# local.properties (SDK 경로는 각자 설정)
+local.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# APK/AAB 빌드 산출물
+*.apk
+*.aab
