@@ -21,20 +21,14 @@
         android:pathData="M20,2 L25,2 Q27,2 27,4 L27,24 Q27,26 25,26 L20,26 Z"
         android:fillColor="#66B2FF"/>
 
-    <!-- 힌지 1 -->
-    <rect
-        android:x="8.2"
-        android:y="2"
-        android:width="1.6"
-        android:height="24"
+    <!-- 힌지 1 (rect -> path) -->
+    <path
+        android:pathData="M8.2,2 L9.8,2 L9.8,26 L8.2,26 Z"
         android:fillColor="#CCCCCC"/>
 
-    <!-- 힌지 2 -->
-    <rect
-        android:x="18.2"
-        android:y="2"
-        android:width="1.6"
-        android:height="24"
+    <!-- 힌지 2 (rect -> path) -->
+    <path
+        android:pathData="M18.2,2 L19.8,2 L19.8,26 L18.2,26 Z"
         android:fillColor="#CCCCCC"/>
 
     <!-- 콘텐츠 라인들 -->

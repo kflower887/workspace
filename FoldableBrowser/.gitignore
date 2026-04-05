@@ -14,3 +14,8 @@ local.properties
 # APK/AAB 빌드 산출물
 *.apk
 *.aab
+
+# Local build artifacts
+local.properties
+app/build/
+.gradle/

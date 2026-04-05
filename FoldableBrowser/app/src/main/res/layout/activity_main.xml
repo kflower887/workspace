@@ -71,7 +71,6 @@
                 android:layout_weight="1"
                 android:background="@null"
                 android:hint="주소 또는 검색어 입력"
-                android:hintTextColor="@color/hint_color"
                 android:imeOptions="actionGo"
                 android:inputType="textUri"
                 android:maxLines="1"

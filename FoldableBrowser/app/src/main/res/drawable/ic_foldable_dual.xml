@@ -20,12 +20,9 @@
         android:strokeColor="#3399FF"
         android:strokeWidth="0.5"/>
 
-    <!-- 중앙 힌지 -->
-    <rect
-        android:x="12.5"
-        android:y="2"
-        android:width="3"
-        android:height="24"
+    <!-- 중앙 힌지 (rect -> path) -->
+    <path
+        android:pathData="M12.5,2 L15.5,2 L15.5,26 L12.5,26 Z"
         android:fillColor="#CCCCCC"/>
 
     <!-- 스크롤 연결 화살표 (위) -->
