@@ -2,6 +2,7 @@ package com.foldablebrowser.app.ui
 
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.os.Bundle
 import android.view.KeyEvent
@@ -15,6 +16,8 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.foldablebrowser.app.R
+import com.foldablebrowser.app.browser.BookmarkItem
+import com.foldablebrowser.app.browser.BrowserSettings
 import com.foldablebrowser.app.browser.BrowserViewModel
 import com.foldablebrowser.app.browser.FoldableBrowserController
 import com.foldablebrowser.app.browser.FoldableMode
@@ -22,17 +25,12 @@ import com.foldablebrowser.app.browser.SyncScrollWebView
 import com.foldablebrowser.app.databinding.ActivityMainBinding
 
 /**
- * 폴더블 스크롤 브라우저 메인 액티비티
+ * 폴더블 스크롤 브라우저 메인 액티비티 v2
  *
- * configChanges 처리 전략:
- * - Manifest에 orientation|screenSize 등을 선언해 Activity 재생성을 막음
- * - onConfigurationChanged()에서 패널 레이아웃만 재배치 (WebView 재생성 없음)
- *
- * 패널 방향 규칙:
- * - 가로 (width > height): 패널을 좌우 수평 배치 → 폴더블 펼친 상태
- * - 세로 (height > width): 패널을 상하 수직 배치 → 폴더블 세운 상태
- *
- * 스크롤 동기화는 방향 무관하게 동일 수식(scrollY 기반)으로 동작
+ * ■ 패널 배치: 항상 가로(좌/우) — 세로 화면에서도 LinearLayout.HORIZONTAL
+ * ■ 동시 스크롤 토글: 상단 툴바 "연동" 버튼
+ * ■ 화면 회전 토글: 상단 툴바 회전 버튼 → requestedOrientation 강제 변경
+ * ■ 히스토리/북마크/설정: 하단 바 버튼에서 실제 동작
  */
 class MainActivity : AppCompatActivity() {
 
@@ -58,15 +56,15 @@ class MainActivity : AppCompatActivity() {
                 }
                 TabManagerActivity.RESULT_NEW_TAB -> {
                     viewModel.addTab()
-                    navigateToUrl("https://www.google.com")
+                    navigateToUrl(viewModel.settings.value?.homePage ?: "https://www.google.com")
                 }
             }
         }
     }
 
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
     // 생명주기
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,35 +77,29 @@ class MainActivity : AppCompatActivity() {
         setupAddressBar()
         setupNavigationButtons()
         setupBottomBar()
+        setupTopControls()
         observeViewModel()
 
         if (savedInstanceState == null) {
-            // 최초 실행: 탭 추가 후 홈 로드
-            viewModel.addTab("https://www.google.com")
-            val mode = viewModel.foldableMode.value ?: FoldableMode.DUAL
-            applyMode(mode, loadUrl = true)
+            viewModel.addTab(viewModel.settings.value?.homePage ?: "https://www.google.com")
+            applyMode(viewModel.foldableMode.value ?: FoldableMode.DUAL, loadUrl = true)
         } else {
-            // 프로세스 복원: 패널만 재구성, URL 재로드 없음
-            // (configChanges 선언으로 일반 회전은 이 경로 불통과)
-            val mode = viewModel.foldableMode.value ?: FoldableMode.DUAL
-            applyMode(mode, loadUrl = false)
+            applyMode(viewModel.foldableMode.value ?: FoldableMode.DUAL, loadUrl = false)
             val url = viewModel.getActiveTab()?.url
             if (!url.isNullOrEmpty()) browserController.loadUrl(url)
         }
     }
 
-    /**
-     * Manifest configChanges 덕분에 회전 시 Activity 재생성 없이 여기로 진입.
-     * WebView를 살린 채로 패널 레이아웃만 방향에 맞게 재배치한다.
-     */
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        // 패널 배치는 항상 HORIZONTAL → 회전해도 재배치만
         rearrangePanels()
-        adjustToolbarForOrientation(newConfig)
     }
 
+    @Suppress("OVERRIDE_DEPRECATION")
     override fun onBackPressed() {
         if (browserController.goBack()) return
+        @Suppress("DEPRECATION")
         super.onBackPressed()
     }
 
@@ -116,22 +108,16 @@ class MainActivity : AppCompatActivity() {
         browserController.destroy()
     }
 
-    // -----------------------------------------------------------------------
-    // 패널 구성 / 재배치
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
+    // 패널 구성 — 항상 HORIZONTAL (좌/우)
+    // ─────────────────────────────────────────────────────────────
 
-    /**
-     * 모드 전환 또는 최초 초기화 시 호출.
-     * WebView를 새로 생성하고 현재 방향에 맞게 배치한다.
-     *
-     * @param loadUrl true면 컨트롤러에 URL 로드 명령. 회전 시에는 false.
-     */
     private fun applyMode(mode: FoldableMode, loadUrl: Boolean = true) {
         viewModel.switchMode(mode)
         binding.webViewContainer.removeAllViews()
 
         val panels = browserController.setupPanels(mode)
-        arrangePanelsInContainer(panels, mode)
+        arrangePanels(panels)
         updateModeButton(mode)
 
         if (loadUrl) {
@@ -140,65 +126,36 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * 회전 전용: WebView 재생성 없이 기존 패널을 떼었다가 새 방향으로 재부착.
-     */
+    /** 회전 시: WebView 재생성 없이 기존 패널 재배치 */
     private fun rearrangePanels() {
         val panels = browserController.getPanels()
         if (panels.isEmpty()) return
-
-        // 컨테이너에서 분리 (WebView 자체는 살아있음)
         binding.webViewContainer.removeAllViews()
-
-        val mode = viewModel.foldableMode.value ?: FoldableMode.DUAL
-        arrangePanelsInContainer(panels, mode)
+        arrangePanels(panels)
     }
 
     /**
-     * 패널 목록을 현재 화면 방향에 맞게 컨테이너에 배치.
-     *
-     * - 가로 화면(landscape / 펼친 폴더블): 패널을 좌→우 수평 배치
-     * - 세로 화면(portrait):               패널을 위→아래 수직 배치
-     *
-     * 단일 패널(SINGLE)은 항상 전체 화면.
+     * 항상 가로(LEFT→RIGHT) 배치.
+     * 세로 화면이든 가로 화면이든 패널은 좌/우로 나란히.
      */
-    private fun arrangePanelsInContainer(
-        panels: List<SyncScrollWebView>,
-        mode: FoldableMode
-    ) {
+    private fun arrangePanels(panels: List<SyncScrollWebView>) {
         if (panels.isEmpty()) return
-
         val container = binding.webViewContainer
-        val landscape = isLandscape()
+        container.orientation = LinearLayout.HORIZONTAL   // 항상 가로
 
-        if (mode == FoldableMode.SINGLE || panels.size == 1) {
-            container.orientation = LinearLayout.HORIZONTAL
+        if (panels.size == 1) {
             val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
             container.addView(panels[0], lp)
             return
         }
 
-        // 가로: 수평 배치(좌우), 세로: 수직 배치(상하)
-        container.orientation = if (landscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
-
         panels.forEachIndexed { index, wv ->
-            val lp = if (landscape) {
-                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
-            } else {
-                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
-            }
+            val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
             container.addView(wv, lp)
 
-            // 패널 사이 구분선 (마지막 패널 제외)
             if (index < panels.size - 1) {
                 val divider = View(this).apply {
-                    layoutParams = if (landscape) {
-                        // 수평 배치 → 세로 구분선
-                        LinearLayout.LayoutParams(2, LinearLayout.LayoutParams.MATCH_PARENT)
-                    } else {
-                        // 수직 배치 → 가로 구분선
-                        LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2)
-                    }
+                    layoutParams = LinearLayout.LayoutParams(2, LinearLayout.LayoutParams.MATCH_PARENT)
                     setBackgroundColor(getColor(R.color.divider_color))
                 }
                 container.addView(divider)
@@ -206,39 +163,47 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // 방향별 툴바 조정
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
+    // 상단 추가 컨트롤 (동시스크롤 토글, 회전 토글)
+    // ─────────────────────────────────────────────────────────────
 
-    /**
-     * 가로 모드에서 하단 바 높이를 줄여 웹 콘텐츠 영역을 최대화.
-     * 세로 모드에서는 원래 높이(56dp)로 복원.
-     */
-    private fun adjustToolbarForOrientation(config: Configuration) {
-        val landscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val bottomBarHeight = if (landscape) dpToPx(40) else dpToPx(56)
-        val topBarHeight   = if (landscape) dpToPx(48) else dpToPx(56)
+    private fun setupTopControls() {
+        // 동시 스크롤 토글 버튼
+        binding.btnSyncScroll.setOnClickListener {
+            val current = viewModel.syncScrollEnabled.value ?: true
+            val next = !current
+            viewModel.syncScrollEnabled.value = next
+            browserController.syncEnabled = next
+            updateSyncButton(next)
+            val msg = if (next) "동시 스크롤 활성 — 우측은 좌측 하단 구간을 따라갑니다"
+                      else "동시 스크롤 비활성 — 우측은 좌측 화면 다음 부분부터 표시"
+            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+        }
 
-        binding.bottomNavBar.layoutParams =
-            (binding.bottomNavBar.layoutParams).apply { height = bottomBarHeight }
-        binding.topToolbar.layoutParams =
-            (binding.topToolbar.layoutParams).apply { height = topBarHeight }
+        // 화면 회전 토글 버튼
+        binding.btnRotate.setOnClickListener {
+            val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+            if (isLandscape) {
+                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                viewModel.forceLandscape.value = false
+            } else {
+                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                viewModel.forceLandscape.value = true
+            }
+        }
 
-        binding.bottomNavBar.requestLayout()
-        binding.topToolbar.requestLayout()
+        // 초기 상태 동기화
+        updateSyncButton(viewModel.syncScrollEnabled.value ?: true)
     }
 
-    private fun dpToPx(dp: Int): Int =
-        (dp * resources.displayMetrics.density + 0.5f).toInt()
-
-    private fun isLandscape(): Boolean {
-        val dm = resources.displayMetrics
-        return dm.widthPixels > dm.heightPixels
+    private fun updateSyncButton(enabled: Boolean) {
+        binding.btnSyncScroll.text = if (enabled) "연동 ON" else "연동 OFF"
+        binding.btnSyncScroll.alpha = if (enabled) 1f else 0.55f
     }
 
-    // -----------------------------------------------------------------------
-    // 브라우저 컨트롤러 콜백 설정
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
+    // 브라우저 컨트롤러 콜백
+    // ─────────────────────────────────────────────────────────────
 
     private fun setupBrowserController() {
         browserController.onPageStarted = { url ->
@@ -265,6 +230,13 @@ class MainActivity : AppCompatActivity() {
                 val activeIdx = viewModel.activeTabIndex.value ?: 0
                 tabs.getOrNull(activeIdx)?.url = url
                 viewModel.tabs.value = tabs
+
+                // 히스토리 자동 저장
+                val title = browserController.getTitle().ifBlank { url }
+                viewModel.addHistory(title, url)
+
+                // 북마크 상태 업데이트
+                updateBookmarkIcon(url)
             }
         }
 
@@ -296,20 +268,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
     // 주소창
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
 
     private fun setupAddressBar() {
         binding.etAddressBar.setOnEditorActionListener { _, actionId, event ->
             if (actionId == EditorInfo.IME_ACTION_GO ||
-                (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)
-            ) {
+                (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)) {
                 val input = binding.etAddressBar.text.toString().trim()
-                if (input.isNotEmpty()) {
-                    navigateToUrl(input)
-                    hideKeyboard()
-                }
+                if (input.isNotEmpty()) { navigateToUrl(input); hideKeyboard() }
                 true
             } else false
         }
@@ -319,93 +287,73 @@ class MainActivity : AppCompatActivity() {
                 binding.etAddressBar.setText(viewModel.currentUrl.value)
                 binding.etAddressBar.selectAll()
             } else {
-                binding.etAddressBar.setText(
-                    extractDisplayUrl(viewModel.currentUrl.value ?: "")
-                )
+                binding.etAddressBar.setText(extractDisplayUrl(viewModel.currentUrl.value ?: ""))
             }
         }
 
         binding.btnRefresh.setOnClickListener {
             if (viewModel.isLoading.value == true) {
                 browserController.stopLoading()
-                binding.btnRefresh.setImageResource(R.drawable.ic_refresh)
             } else {
                 browserController.reload()
             }
         }
     }
 
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
     // 네비게이션 버튼
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
 
     private fun setupNavigationButtons() {
         binding.btnBack.setOnClickListener {
-            if (!browserController.goBack()) {
+            if (!browserController.goBack())
                 Toast.makeText(this, "이전 페이지가 없습니다", Toast.LENGTH_SHORT).show()
-            }
         }
         binding.btnForward.setOnClickListener {
-            if (!browserController.goForward()) {
+            if (!browserController.goForward())
                 Toast.makeText(this, "다음 페이지가 없습니다", Toast.LENGTH_SHORT).show()
-            }
         }
         binding.btnTabCounter.setOnClickListener { openTabManager() }
         binding.btnMenu.setOnClickListener { showBrowserMenu() }
     }
 
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
     // 하단 바
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
 
     private fun setupBottomBar() {
-        binding.btnHome.setOnClickListener { navigateToUrl("https://www.google.com") }
-        binding.btnBookmark.setOnClickListener {
-            Toast.makeText(this, "북마크 기능 준비 중", Toast.LENGTH_SHORT).show()
+        binding.btnHome.setOnClickListener {
+            navigateToUrl(viewModel.settings.value?.homePage ?: "https://www.google.com")
         }
+        binding.btnBookmark.setOnClickListener { showBookmarkDialog() }
         binding.btnFoldableMode.setOnClickListener { showModeSelectionDialog() }
-        binding.btnHistory.setOnClickListener {
-            Toast.makeText(this, "히스토리 기능 준비 중", Toast.LENGTH_SHORT).show()
-        }
-        binding.btnSettings.setOnClickListener {
-            Toast.makeText(this, "설정 기능 준비 중", Toast.LENGTH_SHORT).show()
-        }
+        binding.btnHistory.setOnClickListener { showHistoryDialog() }
+        binding.btnSettings.setOnClickListener { showSettingsDialog() }
     }
 
-    // -----------------------------------------------------------------------
-    // 폴더블 모드 전환
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
+    // 폴더블 모드 선택
+    // ─────────────────────────────────────────────────────────────
 
     private fun showModeSelectionDialog() {
         val currentMode = viewModel.foldableMode.value ?: FoldableMode.DUAL
         val items = arrayOf(
             "📱 일반 모드  (단일 화면)",
-            "📖 2단 폴더블  (좌우/상하 2분할 연속 스크롤)",
-            "📒 3단 폴더블  (3분할 연속 스크롤)"
+            "📖 2단 분할  (좌/우 연속 스크롤)",
+            "📒 3단 분할  (좌/중/우 연속 스크롤)"
         )
         val checkedItem = when (currentMode) {
             FoldableMode.SINGLE -> 0
-            FoldableMode.DUAL   -> 1
+            FoldableMode.DUAL -> 1
             FoldableMode.TRIPLE -> 2
         }
-
         AlertDialog.Builder(this)
             .setTitle("브라우저 분할 모드 선택")
             .setSingleChoiceItems(items, checkedItem) { dialog, which ->
-                val newMode = when (which) {
-                    0 -> FoldableMode.SINGLE
-                    1 -> FoldableMode.DUAL
-                    2 -> FoldableMode.TRIPLE
-                    else -> FoldableMode.DUAL
-                }
+                val newMode = when (which) { 0 -> FoldableMode.SINGLE; 1 -> FoldableMode.DUAL; else -> FoldableMode.TRIPLE }
                 applyMode(newMode, loadUrl = true)
                 dialog.dismiss()
-                val name = when (newMode) {
-                    FoldableMode.SINGLE -> "일반 모드"
-                    FoldableMode.DUAL   -> "2단 폴더블 모드"
-                    FoldableMode.TRIPLE -> "3단 폴더블 모드"
-                }
-                Toast.makeText(this, "$name 로 전환되었습니다", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "${items[which].drop(3)} 로 전환", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("취소", null)
             .show()
@@ -428,9 +376,192 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
+    // 히스토리 다이얼로그
+    // ─────────────────────────────────────────────────────────────
+
+    private fun showHistoryDialog() {
+        val list = viewModel.historyList.value ?: mutableListOf()
+        if (list.isEmpty()) {
+            Toast.makeText(this, "방문 기록이 없습니다", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val titles = list.map { "${it.title}\n${it.url}" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("방문 기록")
+            .setItems(titles) { _, which ->
+                navigateToUrl(list[which].url)
+            }
+            .setNeutralButton("전체 삭제") { _, _ ->
+                AlertDialog.Builder(this)
+                    .setMessage("방문 기록을 모두 삭제하시겠습니까?")
+                    .setPositiveButton("삭제") { _, _ ->
+                        viewModel.clearHistory()
+                        Toast.makeText(this, "방문 기록 삭제 완료", Toast.LENGTH_SHORT).show()
+                    }
+                    .setNegativeButton("취소", null)
+                    .show()
+            }
+            .setNegativeButton("닫기", null)
+            .show()
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 북마크 다이얼로그
+    // ─────────────────────────────────────────────────────────────
+
+    private fun showBookmarkDialog() {
+        val currentUrl = viewModel.currentUrl.value ?: ""
+        val isBookmarked = viewModel.isBookmarked(currentUrl)
+
+        val options = mutableListOf<String>()
+        if (currentUrl.isNotBlank()) {
+            options.add(if (isBookmarked) "★ 북마크 제거" else "☆ 현재 페이지 북마크 추가")
+        }
+        options.add("북마크 목록 보기")
+
+        AlertDialog.Builder(this)
+            .setTitle("북마크")
+            .setItems(options.toTypedArray()) { _, which ->
+                when {
+                    which == 0 && currentUrl.isNotBlank() -> {
+                        if (isBookmarked) {
+                            val id = viewModel.bookmarkList.value?.find { it.url == currentUrl }?.id ?: return@setItems
+                            viewModel.removeBookmark(id)
+                            Toast.makeText(this, "북마크 제거됨", Toast.LENGTH_SHORT).show()
+                        } else {
+                            val title = browserController.getTitle().ifBlank { currentUrl }
+                            viewModel.addBookmark(title, currentUrl)
+                            Toast.makeText(this, "북마크 추가됨", Toast.LENGTH_SHORT).show()
+                        }
+                        updateBookmarkIcon(currentUrl)
+                    }
+                    else -> showBookmarkList()
+                }
+            }
+            .setNegativeButton("닫기", null)
+            .show()
+    }
+
+    private fun showBookmarkList() {
+        val list = viewModel.bookmarkList.value ?: mutableListOf()
+        if (list.isEmpty()) {
+            Toast.makeText(this, "저장된 북마크가 없습니다", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val titles = list.map { "${it.title}\n${it.url}" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("북마크 목록")
+            .setItems(titles) { _, which -> navigateToUrl(list[which].url) }
+            .setNeutralButton("편집") { _, _ -> showBookmarkDeleteDialog() }
+            .setNegativeButton("닫기", null)
+            .show()
+    }
+
+    private fun showBookmarkDeleteDialog() {
+        val list = viewModel.bookmarkList.value ?: return
+        val titles = list.map { it.title }.toTypedArray()
+        val checked = BooleanArray(list.size) { false }
+        AlertDialog.Builder(this)
+            .setTitle("삭제할 북마크 선택")
+            .setMultiChoiceItems(titles, checked) { _, idx, isChecked -> checked[idx] = isChecked }
+            .setPositiveButton("삭제") { _, _ ->
+                list.filterIndexed { idx, _ -> checked[idx] }
+                    .forEach { viewModel.removeBookmark(it.id) }
+                Toast.makeText(this, "선택 북마크 삭제됨", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    private fun updateBookmarkIcon(url: String) {
+        val starred = viewModel.isBookmarked(url)
+        binding.btnBookmark.setImageResource(
+            if (starred) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark
+        )
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 설정 다이얼로그
+    // ─────────────────────────────────────────────────────────────
+
+    private fun showSettingsDialog() {
+        val cur = viewModel.settings.value ?: BrowserSettings()
+        val items = arrayOf(
+            "홈페이지: ${cur.homePage}",
+            "텍스트 크기: ${cur.textSize}%",
+            "자바스크립트: ${if (cur.jsEnabled) "허용" else "차단"}",
+            "데스크톱 모드: ${if (cur.desktopMode) "켜짐" else "꺼짐"}"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("설정")
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> showHomePageSetting(cur)
+                    1 -> showTextSizeSetting(cur)
+                    2 -> {
+                        val newSettings = cur.copy(jsEnabled = !cur.jsEnabled)
+                        viewModel.updateSettings(newSettings)
+                        applySettingsToBrowser(newSettings)
+                        showSettingsDialog()
+                    }
+                    3 -> {
+                        val newSettings = cur.copy(desktopMode = !cur.desktopMode)
+                        viewModel.updateSettings(newSettings)
+                        applySettingsToBrowser(newSettings)
+                        showSettingsDialog()
+                    }
+                }
+            }
+            .setNegativeButton("닫기", null)
+            .show()
+    }
+
+    private fun showHomePageSetting(cur: BrowserSettings) {
+        val editText = android.widget.EditText(this).apply {
+            setText(cur.homePage)
+            hint = "https://www.google.com"
+        }
+        AlertDialog.Builder(this)
+            .setTitle("홈페이지 설정")
+            .setView(editText)
+            .setPositiveButton("저장") { _, _ ->
+                val url = editText.text.toString().trim()
+                if (url.isNotEmpty()) {
+                    val newUrl = if (url.startsWith("http")) url else "https://$url"
+                    viewModel.updateSettings(cur.copy(homePage = newUrl))
+                    Toast.makeText(this, "홈페이지 저장됨", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    private fun showTextSizeSetting(cur: BrowserSettings) {
+        val sizes = arrayOf("75% (작게)", "90%", "100% (보통)", "110%", "125%", "150% (크게)")
+        val sizeValues = intArrayOf(75, 90, 100, 110, 125, 150)
+        val currentIdx = sizeValues.indexOfFirst { it == cur.textSize }.takeIf { it >= 0 } ?: 2
+        AlertDialog.Builder(this)
+            .setTitle("텍스트 크기")
+            .setSingleChoiceItems(sizes, currentIdx) { dialog, which ->
+                val newSettings = cur.copy(textSize = sizeValues[which])
+                viewModel.updateSettings(newSettings)
+                applySettingsToBrowser(newSettings)
+                dialog.dismiss()
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    private fun applySettingsToBrowser(newSettings: BrowserSettings) {
+        // 설정 저장 완료 — 실제 WebView 반영은 다음 페이지 로드 시
+        Toast.makeText(this, "설정이 저장되었습니다\n(다음 페이지부터 적용)", Toast.LENGTH_SHORT).show()
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // 탭 매니저
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
 
     private fun openTabManager() {
         val tabs = viewModel.tabs.value ?: return
@@ -446,9 +577,9 @@ class MainActivity : AppCompatActivity() {
         if (!url.isNullOrEmpty()) browserController.loadUrl(url)
     }
 
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
     // URL 네비게이션
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
 
     private fun navigateToUrl(input: String) {
         val url = when {
@@ -460,20 +591,17 @@ class MainActivity : AppCompatActivity() {
         val activeIdx = viewModel.activeTabIndex.value ?: 0
         tabs.getOrNull(activeIdx)?.url = url
         viewModel.tabs.value = tabs
-
         browserController.loadUrl(url)
         binding.etAddressBar.setText(extractDisplayUrl(url))
     }
 
     private fun extractDisplayUrl(url: String): String = try {
         android.net.Uri.parse(url).host?.removePrefix("www.") ?: url
-    } catch (e: Exception) {
-        url
-    }
+    } catch (e: Exception) { url }
 
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
     // ViewModel 관찰
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
 
     private fun observeViewModel() {
         viewModel.canGoBack.observe(this) { can ->
@@ -490,24 +618,33 @@ class MainActivity : AppCompatActivity() {
             )
         }
         viewModel.tabs.observe(this) { updateTabCounter() }
+        viewModel.syncScrollEnabled.observe(this) { enabled ->
+            updateSyncButton(enabled)
+        }
     }
 
     private fun updateTabCounter() {
         binding.tvTabCount.text = viewModel.getTabCount().toString()
     }
 
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
     // 브라우저 메뉴
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
 
     private fun showBrowserMenu() {
-        val items = arrayOf("새 탭", "현재 페이지 새로고침", "북마크에 추가", "페이지 공유")
+        val items = arrayOf("새 탭", "새로고침", "북마크에 추가", "페이지 공유", "히스토리", "설정")
         AlertDialog.Builder(this)
             .setItems(items) { _, which ->
                 when (which) {
-                    0 -> { viewModel.addTab(); navigateToUrl("https://www.google.com") }
+                    0 -> { viewModel.addTab(); navigateToUrl(viewModel.settings.value?.homePage ?: "https://www.google.com") }
                     1 -> browserController.reload()
-                    2 -> Toast.makeText(this, "북마크 추가 준비 중", Toast.LENGTH_SHORT).show()
+                    2 -> {
+                        val url = viewModel.currentUrl.value ?: ""
+                        val title = browserController.getTitle()
+                        viewModel.addBookmark(title, url)
+                        updateBookmarkIcon(url)
+                        Toast.makeText(this, "북마크 추가됨", Toast.LENGTH_SHORT).show()
+                    }
                     3 -> {
                         val share = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
@@ -515,13 +652,15 @@ class MainActivity : AppCompatActivity() {
                         }
                         startActivity(Intent.createChooser(share, "페이지 공유"))
                     }
+                    4 -> showHistoryDialog()
+                    5 -> showSettingsDialog()
                 }
             }.show()
     }
 
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
     // 유틸
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────
 
     private fun hideKeyboard() {
         val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
