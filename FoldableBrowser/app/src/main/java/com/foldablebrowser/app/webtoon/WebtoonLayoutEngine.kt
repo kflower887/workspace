@@ -3,47 +3,36 @@ package com.foldablebrowser.app.webtoon
 /**
  * 웹툰 컷 비율 감지 & 2열 자동 레이아웃 JS/CSS 인젝터
  *
- * ── 동작 원리 ────────────────────────────────────────────────────────────────
- *  1. 플랫폼별 셀렉터로 웹툰 이미지(<img>) 목록을 수집한다.
- *  2. 각 이미지의 naturalWidth / naturalHeight 비율을 읽는다.
- *     - ratio > WIDE_THRESHOLD  → wide-cut  (전체 너비 100%)
- *     - ratio ≤ WIDE_THRESHOLD  → narrow-cut (50% → 2열 배치)
- *  3. min-width 임계값(MIN_NARROW_PX)으로 말풍선이 너무 작아지는 것을 방지.
- *     → 화면 너비의 절반이 MIN_NARROW_PX 미만이면 narrow-cut을 wide로 격상.
- *  4. 이미지가 아직 로드 안 됐으면 onload 콜백으로 처리.
- *  5. MutationObserver로 동적으로 추가되는 컷도 감지한다 (무한스크롤 대응).
+ * ── 핵심 문제 및 해결 ──────────────────────────────────────────────────────────
+ *  문제: 첫 이미지는 보이는데 그 아래 이미지들이 우측 열에 안 나타남
+ *  원인:
+ *   1) lazy loading — img.src 가 실제로 없고 data-src/data-lazy-src 등에 있음
+ *   2) __wt_done__ = true 로 컨테이너 잠금 후, 새로 추가된 img는 분류 안 됨
+ *   3) 이미지가 아직 로드 안 된 상태에서 naturalWidth = 0 → wide 판정 또는 미처리
+ *   4) 일부 사이트에서 img 없이 div 배경(background-image)으로 컷을 표시
+ *
+ *  해결:
+ *   - __wt_done__ 제거, 대신 img별로 __wt_classified__ 플래그 사용
+ *   - lazy src 속성 (data-src, data-lazy, data-original 등) 자동 감지 & 강제 로드
+ *   - IntersectionObserver 로 뷰포트에 들어오는 img 실시간 분류
+ *   - MutationObserver 도 유지 (무한스크롤 대응)
+ *   - 분류 실패(naturalWidth=0)시 기본값 narrow 처리 후 load 이벤트로 재분류
  *
  * ── 2열 배치 세부 ────────────────────────────────────────────────────────────
  *  - 컨테이너를 flexbox(flex-wrap: wrap)으로 변환
- *  - narrow-cut 두 개가 한 행을 채우고 나머지 공간은 없음
- *  - wide-cut은 flex-basis: 100%로 단독 행 차지
- *  - 컷 사이 gap: 2px (너무 붙으면 컷 경계 구분 어려움)
- *
- * ── 플랫폼 셀렉터 ───────────────────────────────────────────────────────────
- *  WebtoonPlatform enum에 정의. 범용(GENERIC) 규칙이 fallback으로 동작.
+ *  - narrow-cut(세로 긴 컷): flex 50% → 두 컷이 나란히 한 행
+ *  - wide-cut(가로 긴 컷):  flex 100% → 단독 행 차지
+ *  - 홀수 narrow가 마지막이면 100%로 자동 확장
+ *  - gap: 2px
  */
 object WebtoonLayoutEngine {
 
-    /** 와이드컷 판정 비율 (가로/세로). 이 값 초과 → 전체 너비 */
-    private const val WIDE_THRESHOLD = 1.2f
+    private const val WIDE_THRESHOLD = 1.2f   // ratio(w/h) > 이 값 → 와이드컷
+    private const val MIN_NARROW_PX  = 200    // 절반 너비 < 이 값 → 무조건 wide
 
-    /** narrow-cut 최소 표시 너비(px 기준). 이보다 좁으면 wide로 격상 */
-    private const val MIN_NARROW_PX = 200
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // 메인 JS 생성
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * WebView.evaluateJavascript() 에 그대로 넣을 수 있는 JS 문자열 반환.
-     * @param platform  감지된(또는 사용자 선택) 플랫폼
-     * @param screenWidthPx  디바이스 화면 너비 (px)
-     */
     fun buildScript(platform: WebtoonPlatform, screenWidthPx: Int): String {
-        val selectors = platform.imageSelectors.joinToString(", ") { "'$it'" }
-        val containerSelectors = platform.containerSelectors.joinToString(", ") { "'$it'" }
-        val minNarrow = MIN_NARROW_PX
-        val wideThreshold = WIDE_THRESHOLD
+        val imgSels  = platform.imageSelectors.joinToString(", ") { "'$it'" }
+        val contSels = platform.containerSelectors.joinToString(", ") { "'$it'" }
         val halfWidth = screenWidthPx / 2
 
         return """
@@ -51,26 +40,28 @@ object WebtoonLayoutEngine {
   'use strict';
 
   /* ── 상수 ── */
-  const WIDE_THRESHOLD  = $wideThreshold;
-  const MIN_NARROW_PX   = $minNarrow;
-  const HALF_WIDTH_PX   = $halfWidth;
-  const IMG_SELECTORS   = [$selectors];
-  const CONT_SELECTORS  = [$containerSelectors];
+  const WIDE_THRESHOLD = $WIDE_THRESHOLD;
+  const MIN_NARROW_PX  = $MIN_NARROW_PX;
+  const HALF_W         = $halfWidth;
+  const IMG_SELS       = [$imgSels];
+  const CONT_SELS      = [$contSels];
 
   /* ── CSS 주입 (한 번만) ── */
   if (!document.getElementById('__wt_style__')) {
-    const style = document.createElement('style');
-    style.id = '__wt_style__';
-    style.textContent = `
-      .__wt_container__ {
+    const s = document.createElement('style');
+    s.id = '__wt_style__';
+    s.textContent = `
+      .__wt_cont__ {
         display: flex !important;
         flex-wrap: wrap !important;
         gap: 2px !important;
         padding: 0 !important;
         margin: 0 auto !important;
         width: 100% !important;
+        max-width: 100% !important;
         box-sizing: border-box !important;
         align-items: flex-start !important;
+        overflow: visible !important;
       }
       .__wt_wide__ {
         flex: 0 0 100% !important;
@@ -78,7 +69,6 @@ object WebtoonLayoutEngine {
         max-width: 100% !important;
         height: auto !important;
         display: block !important;
-        object-fit: contain !important;
       }
       .__wt_narrow__ {
         flex: 0 0 calc(50% - 1px) !important;
@@ -86,179 +76,265 @@ object WebtoonLayoutEngine {
         max-width: calc(50% - 1px) !important;
         height: auto !important;
         display: block !important;
-        object-fit: contain !important;
       }
-      /* 홀수 narrow가 마지막일 때 전체 너비로 확장 */
       .__wt_narrow__:last-child:nth-child(odd) {
         flex: 0 0 100% !important;
         width: 100% !important;
         max-width: 100% !important;
       }
     `;
-    document.head.appendChild(style);
+    document.head.appendChild(s);
   }
 
-  /* ── 이미지 분류 함수 ── */
-  function classifyImage(img) {
-    function apply(w, h) {
-      img.classList.remove('__wt_wide__', '__wt_narrow__');
-      const ratio = w / Math.max(h, 1);
-      const tooNarrowPanel = (HALF_WIDTH_PX < MIN_NARROW_PX);
-      if (ratio > WIDE_THRESHOLD || tooNarrowPanel) {
-        img.classList.add('__wt_wide__');
-        img.style.setProperty('width', '100%', 'important');
-        img.style.setProperty('max-width', '100%', 'important');
-      } else {
-        img.classList.add('__wt_narrow__');
-        img.style.setProperty('width', 'calc(50% - 1px)', 'important');
-        img.style.setProperty('max-width', 'calc(50% - 1px)', 'important');
+  /* ── lazy-src 속성 목록 ── */
+  const LAZY_ATTRS = [
+    'data-src','data-lazy-src','data-original','data-lazy',
+    'data-hi-res-src','data-url','data-image','lazy-src',
+    'data-actualsrc','data-srcset'
+  ];
+
+  /* ── lazy 이미지에 실제 src 강제 설정 ── */
+  function forceLoadSrc(img) {
+    if (img.__wt_src_forced__) return;
+    for (const attr of LAZY_ATTRS) {
+      const v = img.getAttribute(attr);
+      if (v && v.startsWith('http') && img.src !== v) {
+        img.src = v;
+        img.__wt_src_forced__ = true;
+        return;
       }
-      img.style.setProperty('height', 'auto', 'important');
-      /* Android JS bridge 에 결과 전달 */
-      if (window.WebtoonBridge) {
-        window.WebtoonBridge.onCutClassified(
-          img.src || '',
-          ratio > WIDE_THRESHOLD ? 'wide' : 'narrow',
-          w, h
-        );
+    }
+    /* srcset 처리 */
+    if (!img.src || img.src === window.location.href) {
+      const ss = img.getAttribute('srcset') || img.getAttribute('data-srcset');
+      if (ss) {
+        const first = ss.split(',')[0].trim().split(/\s+/)[0];
+        if (first) { img.src = first; img.__wt_src_forced__ = true; }
+      }
+    }
+  }
+
+  /* ── 이미지 분류 (wide / narrow) ── */
+  function applyClass(img, w, h) {
+    img.classList.remove('__wt_wide__', '__wt_narrow__');
+    const ratio = w / Math.max(h, 1);
+    const isWide = ratio > WIDE_THRESHOLD || HALF_W < MIN_NARROW_PX;
+    const cls    = isWide ? '__wt_wide__' : '__wt_narrow__';
+    img.classList.add(cls);
+    img.__wt_classified__ = true;
+    if (window.WebtoonBridge) {
+      try {
+        WebtoonBridge.onCutClassified(img.src || '', isWide ? 'wide' : 'narrow', w, h);
+      } catch(e) {}
+    }
+  }
+
+  function classifyImg(img) {
+    /* 이미 분류된 경우 재분류하지 않음 (단, naturalWidth가 있으면 재확인) */
+    if (img.__wt_classified__ && img.naturalWidth > 0) return;
+
+    forceLoadSrc(img);
+
+    function tryApply() {
+      const nw = img.naturalWidth, nh = img.naturalHeight;
+      if (nw > 0 && nh > 0) {
+        applyClass(img, nw, nh);
+      } else if (img.offsetWidth > 0) {
+        /* naturalWidth 미확정 → offsetWidth 기준으로 일단 분류, load 후 재분류 */
+        const ow = img.offsetWidth, oh = img.offsetHeight || img.offsetWidth * 2;
+        applyClass(img, ow, oh);
+      } else {
+        /* 크기 불명 → 일단 narrow로 설정, 로드 완료 후 재분류 */
+        img.classList.remove('__wt_wide__', '__wt_narrow__');
+        img.classList.add('__wt_narrow__');
       }
     }
 
     if (img.complete && img.naturalWidth > 0) {
-      apply(img.naturalWidth, img.naturalHeight);
+      tryApply();
     } else {
-      img.addEventListener('load', function handler() {
-        img.removeEventListener('load', handler);
-        apply(img.naturalWidth || img.offsetWidth, img.naturalHeight || img.offsetHeight);
-      });
-      img.addEventListener('error', function() {
+      /* 일단 narrow로 placeholder 설정 */
+      if (!img.__wt_classified__) {
+        img.classList.remove('__wt_wide__', '__wt_narrow__');
+        img.classList.add('__wt_narrow__');
+      }
+      img.addEventListener('load', function onLoad() {
+        img.removeEventListener('load', onLoad);
+        tryApply();
+      }, { once: true });
+      img.addEventListener('error', function onErr() {
+        img.removeEventListener('error', onErr);
+        /* 에러 이미지는 wide로 표시 */
+        img.classList.remove('__wt_wide__', '__wt_narrow__');
         img.classList.add('__wt_wide__');
-      });
+        img.__wt_classified__ = true;
+      }, { once: true });
     }
   }
 
-  /* ── 컨테이너 변환 ── */
-  function transformContainer(container) {
-    if (container.__wt_done__) return;
-    container.__wt_done__ = true;
-    container.classList.add('__wt_container__');
-    /* 부모 요소의 width 제약 해제 */
-    container.style.setProperty('max-width', '100%', 'important');
-    container.style.setProperty('width', '100%', 'important');
-    container.querySelectorAll('img').forEach(classifyImage);
+  /* ── 컨테이너 flex 변환 ── */
+  function setupContainer(el) {
+    if (!el.__wt_cont_set__) {
+      el.__wt_cont_set__ = true;
+      el.classList.add('__wt_cont__');
+      el.style.setProperty('overflow', 'visible', 'important');
+      /* 부모 체인에서 overflow:hidden 제거 */
+      let p = el.parentElement;
+      let depth = 0;
+      while (p && depth < 5) {
+        const ov = getComputedStyle(p).overflow;
+        if (ov === 'hidden') p.style.setProperty('overflow', 'visible', 'important');
+        p = p.parentElement; depth++;
+      }
+    }
+    /* 컨테이너 안 모든 img 분류 (새로 추가된 img도 처리) */
+    el.querySelectorAll('img').forEach(classifyImg);
   }
 
-  /* ── 셀렉터 탐색 ── */
-  function findAndTransform() {
+  /* ── 최상위 탐색 ── */
+  function findAndProcess() {
     let found = false;
 
     /* 1) 플랫폼 전용 컨테이너 */
-    CONT_SELECTORS.forEach(sel => {
+    for (const sel of CONT_SELS) {
       try {
         document.querySelectorAll(sel).forEach(el => {
-          transformContainer(el);
+          setupContainer(el);
           found = true;
         });
       } catch(e) {}
-    });
+    }
 
-    /* 2) 플랫폼 전용 이미지 (컨테이너 없이 직접) */
+    /* 2) 플랫폼 전용 img → 부모를 컨테이너로 */
     if (!found) {
-      IMG_SELECTORS.forEach(sel => {
+      for (const sel of IMG_SELS) {
         try {
           document.querySelectorAll(sel).forEach(img => {
-            const parent = img.parentElement;
-            if (parent && !parent.__wt_done__) transformContainer(parent);
-            else classifyImage(img);
+            const p = img.parentElement;
+            if (p) setupContainer(p);
+            else classifyImg(img);
             found = true;
           });
         } catch(e) {}
-      });
+      }
     }
 
-    /* 3) Fallback: 화면 너비의 30% 이상인 이미지 모두 */
+    /* 3) Fallback: 화면 너비 25% 이상인 img를 웹툰 컷으로 간주 */
     if (!found) {
+      const threshold = window.innerWidth * 0.25;
       document.querySelectorAll('img').forEach(img => {
         const w = img.offsetWidth || img.naturalWidth || 0;
-        if (w > window.innerWidth * 0.3) {
-          const parent = img.parentElement;
-          if (parent && !parent.__wt_done__) transformContainer(parent);
-          else classifyImage(img);
+        if (w >= threshold) {
+          const p = img.parentElement;
+          if (p) setupContainer(p);
+          else classifyImg(img);
+          found = true;
         }
       });
     }
   }
 
-  /* ── MutationObserver: 무한스크롤 대응 ── */
-  if (!window.__wt_observer__) {
-    window.__wt_observer__ = new MutationObserver(function(mutations) {
-      let needsUpdate = false;
-      mutations.forEach(function(m) {
-        m.addedNodes.forEach(function(node) {
-          if (node.nodeType === 1) needsUpdate = true;
-        });
+  /* ── IntersectionObserver: 뷰포트 진입 시 lazy img 강제 로드 & 재분류 ── */
+  if (!window.__wt_io__ && 'IntersectionObserver' in window) {
+    window.__wt_io__ = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          const img = entry.target;
+          forceLoadSrc(img);
+          if (!img.__wt_classified__ || img.naturalWidth === 0) classifyImg(img);
+        }
       });
-      if (needsUpdate) findAndTransform();
+    }, { rootMargin: '200px' });
+  }
+
+  /* ── MutationObserver: DOM 변경(무한스크롤·동적 컷) 감지 ── */
+  if (!window.__wt_mo__) {
+    window.__wt_mo__ = new MutationObserver(function(muts) {
+      let hasNew = false;
+      muts.forEach(function(m) {
+        m.addedNodes.forEach(function(n) {
+          if (n.nodeType !== 1) return;
+          hasNew = true;
+          /* 새 img는 IntersectionObserver에 등록 */
+          if (n.tagName === 'IMG') {
+            classifyImg(n);
+            if (window.__wt_io__) window.__wt_io__.observe(n);
+          }
+          n.querySelectorAll && n.querySelectorAll('img').forEach(img => {
+            classifyImg(img);
+            if (window.__wt_io__) window.__wt_io__.observe(img);
+          });
+        });
+        /* 기존 img의 src 변경 감지 (lazy load 트리거) */
+        if (m.type === 'attributes' && m.target.tagName === 'IMG') {
+          const img = m.target;
+          img.__wt_classified__ = false;
+          classifyImg(img);
+        }
+      });
+      if (hasNew) findAndProcess();
     });
-    window.__wt_observer__.observe(document.body, {
-      childList: true, subtree: true
+    window.__wt_mo__.observe(document.body, {
+      childList: true, subtree: true,
+      attributes: true, attributeFilter: ['src','data-src','data-lazy-src']
+    });
+  }
+
+  /* ── 기존 img 모두 IntersectionObserver 등록 ── */
+  function registerAllImgs() {
+    if (!window.__wt_io__) return;
+    document.querySelectorAll('img').forEach(img => {
+      window.__wt_io__.observe(img);
     });
   }
 
   /* ── 즉시 실행 ── */
-  findAndTransform();
+  findAndProcess();
+  registerAllImgs();
 
-  /* ── 지연 재실행 (이미지 지연 로딩 대응) ── */
-  setTimeout(findAndTransform, 600);
-  setTimeout(findAndTransform, 1500);
-  setTimeout(findAndTransform, 3000);
-  setTimeout(findAndTransform, 6000);
+  /* ── 지연 재실행 (다양한 lazy-load 타이밍 대응) ── */
+  [500, 1200, 2500, 4500, 8000].forEach(t => setTimeout(() => {
+    findAndProcess();
+    registerAllImgs();
+  }, t));
 
   return 'WebtoonLayout:OK';
 })();
         """.trimIndent()
     }
 
-    /**
-     * 웹툰 레이아웃을 완전히 제거하고 원래 페이지로 복원하는 JS
-     */
     fun buildResetScript(): String = """
 (function() {
   const style = document.getElementById('__wt_style__');
   if (style) style.remove();
-  document.querySelectorAll('.__wt_container__').forEach(el => {
-    el.classList.remove('__wt_container__');
-    el.__wt_done__ = false;
-    el.style.removeProperty('max-width');
-    el.style.removeProperty('width');
+
+  document.querySelectorAll('.__wt_cont__').forEach(el => {
+    el.classList.remove('__wt_cont__');
+    el.__wt_cont_set__ = false;
   });
   document.querySelectorAll('.__wt_wide__, .__wt_narrow__').forEach(img => {
     img.classList.remove('__wt_wide__', '__wt_narrow__');
-    img.style.removeProperty('width');
-    img.style.removeProperty('max-width');
-    img.style.removeProperty('height');
+    img.__wt_classified__ = false;
+    img.__wt_src_forced__  = false;
   });
-  if (window.__wt_observer__) {
-    window.__wt_observer__.disconnect();
-    window.__wt_observer__ = null;
-  }
+
+  if (window.__wt_mo__)  { window.__wt_mo__.disconnect();  window.__wt_mo__  = null; }
+  if (window.__wt_io__)  { window.__wt_io__.disconnect();  window.__wt_io__  = null; }
+
   return 'WebtoonLayout:RESET';
 })();
     """.trimIndent()
 
-    /**
-     * 현재 페이지 URL 기반으로 플랫폼을 자동 감지한다.
-     */
     fun detectPlatform(url: String): WebtoonPlatform {
         val lower = url.lowercase()
         return when {
-            "comic.naver.com" in lower || "webtoon.naver.com" in lower -> WebtoonPlatform.NAVER
-            "webtoon.kakao.com" in lower || "kakaopage.com" in lower   -> WebtoonPlatform.KAKAO
-            "lezhin.com" in lower                                       -> WebtoonPlatform.LEZHIN
-            "bomtoon.com" in lower                                      -> WebtoonPlatform.BOMTOON
-            "toomics.com" in lower                                      -> WebtoonPlatform.TOOMICS
-            "tapas.io" in lower                                         -> WebtoonPlatform.TAPAS
-            "webtoons.com" in lower                                     -> WebtoonPlatform.LINE
+            "comic.naver.com"  in lower || "webtoon.naver.com" in lower -> WebtoonPlatform.NAVER
+            "webtoon.kakao.com" in lower || "kakaopage.com"    in lower -> WebtoonPlatform.KAKAO
+            "lezhin.com"       in lower                                 -> WebtoonPlatform.LEZHIN
+            "bomtoon.com"      in lower                                 -> WebtoonPlatform.BOMTOON
+            "toomics.com"      in lower                                 -> WebtoonPlatform.TOOMICS
+            "tapas.io"         in lower                                 -> WebtoonPlatform.TAPAS
+            "webtoons.com"     in lower                                 -> WebtoonPlatform.LINE
             else                                                        -> WebtoonPlatform.GENERIC
         }
     }
