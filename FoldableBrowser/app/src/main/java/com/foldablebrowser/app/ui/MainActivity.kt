@@ -16,7 +16,6 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.foldablebrowser.app.R
-import com.foldablebrowser.app.browser.BookmarkItem
 import com.foldablebrowser.app.browser.BrowserSettings
 import com.foldablebrowser.app.browser.BrowserViewModel
 import com.foldablebrowser.app.browser.FoldableBrowserController
@@ -25,11 +24,15 @@ import com.foldablebrowser.app.browser.SyncScrollWebView
 import com.foldablebrowser.app.databinding.ActivityMainBinding
 
 /**
- * 폴더블 스크롤 브라우저 메인 액티비티 v2
+ * 폴더블 스크롤 브라우저 메인 액티비티 v3
  *
- * ■ 패널 배치: 항상 가로(좌/우) — 세로 화면에서도 LinearLayout.HORIZONTAL
- * ■ 동시 스크롤 토글: 상단 툴바 "연동" 버튼
- * ■ 화면 회전 토글: 상단 툴바 회전 버튼 → requestedOrientation 강제 변경
+ * ■ 패널 배치: 항상 가로(좌/우) — 세로/가로 관계없이 HORIZONTAL
+ * ■ 스크롤 연동 버튼 (lockOffset 방식)
+ *     OFF(기본): 각 패널 완전 독립. 사용자가 원하는 위치로 각각 이동.
+ *     ON 누름:  그 순간 각 패널의 위치 차이를 offset으로 확정(lock)
+ *               이후 마스터 스크롤 → 슬레이브는 고정 offset 만큼 뒤따름
+ *     새 URL 로드 / reload 시 자동으로 연동 해제
+ * ■ 화면 회전 버튼: 세로↔가로 강제 전환
  * ■ 히스토리/북마크/설정: 하단 바 버튼에서 실제 동작
  */
 class MainActivity : AppCompatActivity() {
@@ -164,23 +167,55 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 상단 추가 컨트롤 (동시스크롤 토글, 회전 토글)
+    // 상단 컨트롤바 (연동 잠금 버튼 + 화면 회전 버튼)
     // ─────────────────────────────────────────────────────────────
 
     private fun setupTopControls() {
-        // 동시 스크롤 토글 버튼
+        // ── 연동 버튼 ──────────────────────────────────────────────
         binding.btnSyncScroll.setOnClickListener {
-            val current = viewModel.syncScrollEnabled.value ?: true
-            val next = !current
-            viewModel.syncScrollEnabled.value = next
-            browserController.syncEnabled = next
-            updateSyncButton(next)
-            val msg = if (next) "동시 스크롤 활성 — 우측은 좌측 하단 구간을 따라갑니다"
-                      else "동시 스크롤 비활성 — 우측은 좌측 화면 다음 부분부터 표시"
-            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+            val mode = viewModel.foldableMode.value ?: FoldableMode.SINGLE
+            if (mode == FoldableMode.SINGLE) {
+                Toast.makeText(this, "분할 모드에서만 사용할 수 있습니다", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            if (browserController.isSyncActive) {
+                // ── 연동 해제 ──
+                browserController.unlockSync()
+                viewModel.syncScrollEnabled.value = false
+                updateSyncButton(false)
+                Toast.makeText(
+                    this,
+                    "연동 해제 — 각 화면을 자유롭게 스크롤하세요",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                // ── 연동 잠금 ──
+                // 현재 각 패널의 위치로 offset 확정
+                val offsets = browserController.lockSyncFromCurrentPositions()
+                viewModel.syncScrollEnabled.value = true
+                updateSyncButton(true)
+
+                // 사용자에게 확정된 오프셋 안내
+                val offsetDesc = offsets.drop(1).mapIndexed { idx, off ->
+                    val panel = if (idx == 0) "우측" else "${idx + 2}번째"
+                    val dir = when {
+                        off > 0 -> "${off}px 아래"
+                        off < 0 -> "${-off}px 위"
+                        else -> "동일 위치"
+                    }
+                    "$panel: $dir"
+                }.joinToString(", ")
+
+                Toast.makeText(
+                    this,
+                    "연동 잠금!\n좌측 스크롤 시 우측이 현재 위치 차이를 유지하며 따라갑니다.\n($offsetDesc)",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
 
-        // 화면 회전 토글 버튼
+        // ── 화면 회전 버튼 ──────────────────────────────────────────
         binding.btnRotate.setOnClickListener {
             val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
             if (isLandscape) {
@@ -192,13 +227,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 초기 상태 동기화
-        updateSyncButton(viewModel.syncScrollEnabled.value ?: true)
+        // 초기 상태 반영
+        updateSyncButton(browserController.isSyncActive)
     }
 
-    private fun updateSyncButton(enabled: Boolean) {
-        binding.btnSyncScroll.text = if (enabled) "연동 ON" else "연동 OFF"
-        binding.btnSyncScroll.alpha = if (enabled) 1f else 0.55f
+    private fun updateSyncButton(locked: Boolean) {
+        if (locked) {
+            binding.btnSyncScroll.text = "연동 ON"
+            binding.btnSyncScroll.alpha = 1f
+            binding.btnSyncScroll.setTextColor(getColor(R.color.sync_on_color))
+        } else {
+            binding.btnSyncScroll.text = "연동 OFF"
+            binding.btnSyncScroll.alpha = 0.6f
+            binding.btnSyncScroll.setTextColor(getColor(R.color.sync_off_color))
+        }
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -230,6 +272,9 @@ class MainActivity : AppCompatActivity() {
                 val activeIdx = viewModel.activeTabIndex.value ?: 0
                 tabs.getOrNull(activeIdx)?.url = url
                 viewModel.tabs.value = tabs
+
+                // 새 페이지 로드 완료 → 연동 버튼 상태 업데이트 (controller가 자동 해제함)
+                updateSyncButton(browserController.isSyncActive)
 
                 // 히스토리 자동 저장
                 val title = browserController.getTitle().ifBlank { url }
@@ -618,9 +663,8 @@ class MainActivity : AppCompatActivity() {
             )
         }
         viewModel.tabs.observe(this) { updateTabCounter() }
-        viewModel.syncScrollEnabled.observe(this) { enabled ->
-            updateSyncButton(enabled)
-        }
+        // syncScrollEnabled 는 controller 상태에서 직접 읽으므로 observe 불필요
+        // (버튼 상태는 setupTopControls / onPageFinished 에서 갱신)
     }
 
     private fun updateTabCounter() {

@@ -28,6 +28,8 @@
 
     <!-- 컨트롤 바 (동시스크롤/회전 버튼 영역) -->
     <color name="control_bar_bg">#F0F2F5</color>
+    <color name="sync_on_color">#0066CC</color>
+    <color name="sync_off_color">#888888</color>
 
     <!-- 아이콘 -->
     <color name="icon_default">#666666</color>

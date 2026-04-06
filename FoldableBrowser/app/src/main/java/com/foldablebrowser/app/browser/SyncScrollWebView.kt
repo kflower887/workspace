@@ -7,15 +7,21 @@ import android.webkit.WebView
 /**
  * 동기화 스크롤 WebView
  *
- * ■ 동시 스크롤 활성(syncEnabled = true)
- *   - 패널 0(마스터)이 스크롤하면 패널 1·2는 각자 구간 오프셋으로 따라감
- *   - 공식: slaveScrollY = masterScrollY - panelIndex * (totalScrollable / totalPanels)
+ * ── 연동 OFF (기본) ────────────────────────────────────────────────
+ *   각 패널이 완전히 독립적으로 스크롤된다.
+ *   사용자가 좌측을 A 위치, 우측을 B 위치에 놓은 뒤 연동을 켠다.
  *
- * ■ 동시 스크롤 비활성(syncEnabled = false)
- *   - 각 패널이 완전히 독립적으로 스크롤
- *   - 단, URL·내용은 동일 (마스터가 로딩 완료 후 슬레이브에 같은 URL 로드)
- *   - 슬레이브 패널은 초기 위치가 마스터 화면 높이(viewHeight)만큼 아래로 설정됨
- *     → "좌측 화면 하단 다음 부분"을 보여주는 효과
+ * ── 연동 ON ────────────────────────────────────────────────────────
+ *   연동을 켜는 순간 각 슬레이브 패널의 [lockedOffsetFromMaster] 가 확정된다.
+ *     lockedOffsetFromMaster = slaveScrollY - masterScrollY  (부호 포함)
+ *
+ *   이후 마스터가 delta 만큼 스크롤하면
+ *     슬레이브 목표 scrollY = masterScrollY + lockedOffsetFromMaster
+ *   범위는 [0, maxScroll] 로 클램핑.
+ *
+ *   이 방식의 장점:
+ *   - WebView contentHeight 계산 타이밍과 무관하게 정확히 동작
+ *   - 사용자가 원하는 위치에서 직접 잠그므로 항상 직관적
  */
 class SyncScrollWebView @JvmOverloads constructor(
     context: Context,
@@ -24,58 +30,43 @@ class SyncScrollWebView @JvmOverloads constructor(
 ) : WebView(context, attrs, defStyleAttr) {
 
     var panelIndex: Int = 0
-    var totalPanels: Int = 1
 
-    /** true = 동시스크롤 연동 / false = 독립 스크롤 (초기 오프셋만 적용) */
-    var syncEnabled: Boolean = true
+    /** 마스터(패널0) 스크롤 이벤트 콜백 — 컨트롤러가 세팅 */
+    var onScrollChangedListener: ((scrollY: Int) -> Unit)? = null
 
-    /** 마스터 패널의 스크롤 변화를 콜백으로 전달 */
-    var onScrollChangedListener: ((scrollY: Int, panelIndex: Int) -> Unit)? = null
+    /**
+     * 연동 ON 시 확정된 오프셋.
+     * slave.scrollY = master.scrollY + lockedOffsetFromMaster
+     * null 이면 아직 잠금 전(연동 OFF 상태)
+     */
+    var lockedOffsetFromMaster: Int? = null
 
     private var isSyncScrolling = false
 
     override fun onScrollChanged(l: Int, t: Int, oldl: Int, oldt: Int) {
         super.onScrollChanged(l, t, oldl, oldt)
-        if (!isSyncScrolling) {
-            onScrollChangedListener?.invoke(t, panelIndex)
+        // 마스터 패널만 콜백 (슬레이브가 프로그래밍 방식으로 스크롤될 때는 무시)
+        if (panelIndex == 0 && !isSyncScrolling) {
+            onScrollChangedListener?.invoke(t)
         }
     }
 
     /**
-     * 동시 스크롤 모드: 마스터 scrollY 기반으로 이 패널의 위치 계산
+     * 마스터의 현재 scrollY 를 받아서 이 패널의 위치를 갱신한다.
+     * lockedOffsetFromMaster 가 null 이면(연동 OFF) 아무것도 안 한다.
      */
-    fun syncScrollFromMaster(masterScrollY: Int) {
-        if (totalPanels <= 1 || !syncEnabled) return
+    fun applyMasterScroll(masterScrollY: Int) {
+        val offset = lockedOffsetFromMaster ?: return      // 연동 OFF 면 무시
         val contentH = computeVerticalScrollRange()
         val viewH = height
-        if (contentH <= viewH) return
-
-        val totalScrollable = contentH - viewH
-        val perPanel = totalScrollable.toFloat() / totalPanels
-        val targetScroll = (masterScrollY - panelIndex * perPanel).toInt()
-            .coerceIn(0, totalScrollable)
-
+        val maxScroll = (contentH - viewH).coerceAtLeast(0)
+        val target = (masterScrollY + offset).coerceIn(0, maxScroll)
         isSyncScrolling = true
-        scrollTo(0, targetScroll)
+        scrollTo(0, target)
         isSyncScrolling = false
     }
 
-    /**
-     * 비동시 스크롤 모드: 슬레이브 패널을 마스터 뷰 높이만큼 아래로 초기 배치
-     * → "좌측(마스터) 화면 하단 바로 다음"이 우측(슬레이브) 최상단에 오는 효과
-     */
-    fun setInitialOffsetFromMasterHeight(masterViewHeight: Int, panelIdx: Int) {
-        if (panelIdx == 0) return
-        val contentH = computeVerticalScrollRange()
-        val viewH = height
-        if (contentH <= viewH) return
-
-        val totalScrollable = contentH - viewH
-        // 패널 N의 시작 위치 = masterViewHeight * N
-        val targetScroll = (masterViewHeight * panelIdx).coerceIn(0, totalScrollable)
-
-        isSyncScrolling = true
-        scrollTo(0, targetScroll)
-        isSyncScrolling = false
-    }
+    /** 현재 스크롤 가능한 최대 Y 값 */
+    fun maxScrollY(): Int =
+        (computeVerticalScrollRange() - height).coerceAtLeast(0)
 }

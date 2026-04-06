@@ -41,8 +41,12 @@ class BrowserViewModel : ViewModel() {
     val canGoForward = MutableLiveData(false)
     val loadProgress = MutableLiveData(0)
 
-    /** 동시 스크롤 ON/OFF */
-    val syncScrollEnabled = MutableLiveData(true)
+    /**
+     * 스크롤 연동 상태.
+     * false(기본) = 각 패널 독립 스크롤 (사용자가 원하는 위치로 직접 이동)
+     * true = 연동 ON — lockSyncFromCurrentPositions() 호출로 오프셋 확정 후 따라감
+     */
+    val syncScrollEnabled = MutableLiveData(false)
 
     /** 화면 강제 가로 모드 */
     val forceLandscape = MutableLiveData(false)
