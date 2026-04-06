@@ -6,11 +6,13 @@ import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowInsetsController
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -49,6 +51,11 @@ class MainActivity : AppCompatActivity() {
 
     private var isWebtoonMode = false
     private var isFullscreen  = false
+
+    // 웹툰 네비 버튼 위치: LEFT_BOTTOM / LEFT_TOP / RIGHT_BOTTOM / RIGHT_TOP
+    // 각 값은 FrameLayout.LayoutParams의 gravity 값
+    private var navLeftGravity  = Gravity.BOTTOM or Gravity.START
+    private var navRightGravity = Gravity.BOTTOM or Gravity.END
 
     // 전체화면 시 UI 자동 복귀 Runnable
     private val fullscreenHintHideRunnable = Runnable {
@@ -335,6 +342,18 @@ class MainActivity : AppCompatActivity() {
         binding.btnLeftNext.setOnClickListener  { browserController.webtoonPageNext() }
         binding.btnRightPrev.setOnClickListener { browserController.webtoonPagePrev() }
         binding.btnRightNext.setOnClickListener { browserController.webtoonPageNext() }
+
+        // ── 롱클릭: 버튼 위치 변경 다이얼로그 ──
+        val leftLongClick = View.OnLongClickListener {
+            showNavPositionDialog(isLeft = true); true
+        }
+        val rightLongClick = View.OnLongClickListener {
+            showNavPositionDialog(isLeft = false); true
+        }
+        binding.btnLeftPrev.setOnLongClickListener(leftLongClick)
+        binding.btnLeftNext.setOnLongClickListener(leftLongClick)
+        binding.btnRightPrev.setOnLongClickListener(rightLongClick)
+        binding.btnRightNext.setOnLongClickListener(rightLongClick)
 
         // ── 플랫폼 버튼 숨김 (웹툰 모드 재설계로 불필요) ──
         binding.btnPlatform.visibility = View.GONE
@@ -628,7 +647,8 @@ class MainActivity : AppCompatActivity() {
             "홈페이지: ${cur.homePage}",
             "텍스트 크기: ${cur.textSize}%",
             "자바스크립트: ${if (cur.jsEnabled) "허용" else "차단"}",
-            "데스크톱 모드: ${if (cur.desktopMode) "켜짐" else "꺼짐"}"
+            "데스크톱 모드: ${if (cur.desktopMode) "켜짐" else "꺼짐"}",
+            "⌨️ 한/영 키보드 전환"
         )
         AlertDialog.Builder(this).setTitle("설정")
             .setItems(items) { _, which ->
@@ -645,9 +665,87 @@ class MainActivity : AppCompatActivity() {
                                viewModel.updateSettings(cur.copy(textSize = vals[w])); d.dismiss() }.setNegativeButton("취소",null).show() }
                     2 -> { viewModel.updateSettings(cur.copy(jsEnabled = !cur.jsEnabled)); showSettingsDialog() }
                     3 -> { viewModel.updateSettings(cur.copy(desktopMode = !cur.desktopMode)); showSettingsDialog() }
+                    4 -> switchInputLanguage()
                 }
             }
             .setNegativeButton("닫기", null).show()
+    }
+
+    /**
+     * 한/영 키보드 전환.
+     * InputMethodManager.switchToNextInputMethod() 로 다음 IME 로 순환.
+     * 설치된 IME가 한국어/영어 두 가지라면 토글처럼 동작한다.
+     */
+    @Suppress("DEPRECATION")
+    private fun switchInputLanguage() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        // 현재 포커스된 뷰 기준으로 IME 전환 (없으면 WebView 기준)
+        val focusedView = currentFocus
+            ?: browserController.getMasterView()
+            ?: binding.root
+        try {
+            // API 28+: switchToNextInputMethod
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                imm.switchToNextInputMethod(focusedView.windowToken, false)
+            } else {
+                @Suppress("DEPRECATION")
+                imm.switchToLastInputMethod(focusedView.windowToken)
+            }
+            Toast.makeText(this, "⌨️ 입력기 전환", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            // 전환 실패 시 시스템 IME 선택 다이얼로그 열기
+            imm.showInputMethodPicker()
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 웹툰 네비 버튼 위치 변경
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * 롱클릭 시 호출. 4가지 위치 선택 다이얼로그 표시.
+     * isLeft=true  → webtoonNavLeft  (좌패널 버튼 그룹)
+     * isLeft=false → webtoonNavRight (우패널 버튼 그룹)
+     */
+    private fun showNavPositionDialog(isLeft: Boolean) {
+        val panelName = if (isLeft) "좌측" else "우측"
+        // 현재 위치 표시
+        val currentGravity = if (isLeft) navLeftGravity else navRightGravity
+        val positions = listOf(
+            "↙ 좌측 하단"   to (Gravity.BOTTOM or Gravity.START),
+            "↖ 좌측 상단"   to (Gravity.TOP    or Gravity.START),
+            "↘ 우측 하단"   to (Gravity.BOTTOM or Gravity.END),
+            "↗ 우측 상단"   to (Gravity.TOP    or Gravity.END)
+        )
+        val labels   = positions.map { it.first }.toTypedArray()
+        val gravities = positions.map { it.second }
+        val checkedIdx = gravities.indexOfFirst { it == currentGravity }.takeIf { it >= 0 } ?: 0
+
+        AlertDialog.Builder(this)
+            .setTitle("$panelName 패널 버튼 위치")
+            .setSingleChoiceItems(labels, checkedIdx) { dialog, which ->
+                val newGravity = gravities[which]
+                val navView = if (isLeft) binding.webtoonNavLeft else binding.webtoonNavRight
+                applyNavGravity(navView, newGravity)
+                if (isLeft) navLeftGravity  = newGravity
+                else        navRightGravity = newGravity
+                dialog.dismiss()
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    /** FrameLayout.LayoutParams.gravity 를 변경하여 버튼 그룹 위치 이동 */
+    private fun applyNavGravity(view: android.view.View, gravity: Int) {
+        val lp = view.layoutParams as? FrameLayout.LayoutParams ?: return
+        // 상단/하단 margin 조정
+        val marginV = (8 * resources.displayMetrics.density).toInt()  // 8dp
+        lp.gravity       = gravity
+        lp.topMargin     = if (gravity and Gravity.TOP    != 0) marginV else 0
+        lp.bottomMargin  = if (gravity and Gravity.BOTTOM != 0) marginV + (16 * resources.displayMetrics.density).toInt() else 0
+        lp.marginStart   = if (gravity and Gravity.START  != 0) marginV else 0
+        lp.marginEnd     = if (gravity and Gravity.END    != 0) marginV else 0
+        view.layoutParams = lp
     }
 
     // ─────────────────────────────────────────────────────────────

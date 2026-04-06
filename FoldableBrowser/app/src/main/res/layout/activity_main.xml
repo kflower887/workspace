@@ -315,7 +315,8 @@
                 android:textColor="#FFFFFFFF"
                 android:textSize="15sp"
                 android:textStyle="bold"
-                android:alpha="0.80" />
+                android:alpha="0.80"
+                android:longClickable="true" />
 
             <View android:layout_width="1dp" android:layout_height="6dp" />
 
@@ -330,7 +331,8 @@
                 android:textColor="#FFFFFFFF"
                 android:textSize="15sp"
                 android:textStyle="bold"
-                android:alpha="0.80" />
+                android:alpha="0.80"
+                android:longClickable="true" />
 
         </LinearLayout>
 
@@ -357,7 +359,8 @@
                 android:textColor="#FFFFFFFF"
                 android:textSize="15sp"
                 android:textStyle="bold"
-                android:alpha="0.80" />
+                android:alpha="0.80"
+                android:longClickable="true" />
 
             <View android:layout_width="1dp" android:layout_height="6dp" />
 
@@ -372,6 +375,7 @@
                 android:textColor="#FFFFFFFF"
                 android:textSize="15sp"
                 android:textStyle="bold"
+                android:longClickable="true"
                 android:alpha="0.80" />
 
         </LinearLayout>
