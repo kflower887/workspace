@@ -99,7 +99,11 @@ class MainActivity : AppCompatActivity() {
         // 화면 회전 시 웹툰 모드면 패널 높이 재기준으로 재배치
         if (isWebtoonMode) {
             binding.webViewContainer.post {
-                browserController.initWebtoonPageMode()
+                if (browserController.isSyncActive) {
+                    browserController.lockWebtoonSync()
+                } else {
+                    browserController.initWebtoonPageMode()
+                }
             }
         }
     }
@@ -130,7 +134,7 @@ class MainActivity : AppCompatActivity() {
             applyMode(FoldableMode.DUAL, loadUrl = true)
         }
 
-        // 연동 버튼 숨김 (웹툰 모드에서는 버튼 네비게이션 사용)
+        // 연동 버튼 초기 상태 (웹툰 모드 - 연동 OFF 상태로 시작)
         updateSyncButton(active = false, webtoonMode = true)
 
         // 패널 레이아웃 완료 후 페이지 초기 배치
@@ -155,7 +159,7 @@ class MainActivity : AppCompatActivity() {
     private fun disableWebtoonMode() {
         isWebtoonMode = false
         viewModel.webtoonModeEnabled.value = false
-        browserController.disableWebtoonSync()
+        browserController.unlockWebtoonSync()
         updateSyncButton(active = false, webtoonMode = false)
         updateWebtoonButton(false)
         // 좌/우 네비게이션 오버레이 버튼 숨김
@@ -231,9 +235,23 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (isWebtoonMode) {
-                // 웹툰 버튼 모드: 연동 초기화 (1페이지/2페이지 재배치)
-                browserController.initWebtoonPageMode()
-                Toast.makeText(this, "📖 웹툰 초기화\n좌=1페이지, 우=2페이지로 재배치했습니다", Toast.LENGTH_SHORT).show()
+                // 웹툰 모드: 연동 ON/OFF 토글
+                if (browserController.isSyncActive) {
+                    // 연동 OFF → 각 패널 독립 스크롤 (현재 위치 유지)
+                    browserController.unlockWebtoonSync()
+                    updateSyncButton(active = false, webtoonMode = true)
+                    Toast.makeText(this,
+                        "🔓 연동 OFF\n각 화면을 자유롭게 스크롤하세요\n[이전]/[다음] 버튼은 계속 작동합니다",
+                        Toast.LENGTH_SHORT).show()
+                } else {
+                    // 연동 ON → 현재 좌측 위치 기준 우측 offset=panelH 고정
+                    browserController.lockWebtoonSync()
+                    updateSyncButton(active = true, webtoonMode = true)
+                    val panelH = browserController.getMasterView()?.height ?: 0
+                    Toast.makeText(this,
+                        "🔗 연동 ON\n좌측 스크롤 시 우측이 ${panelH}px 뒤에서 따라옵니다\n버튼으로 페이지 이동도 가능합니다",
+                        Toast.LENGTH_SHORT).show()
+                }
             } else {
                 // 일반 모드: 현재 위치 기준 잠금
                 if (browserController.isSyncActive) {
@@ -263,13 +281,18 @@ class MainActivity : AppCompatActivity() {
                 .setTitle("📌 스크롤 연동 사용법")
                 .setMessage(
                     if (isWebtoonMode)
-                        "【웹툰 모드 버튼 네비게이션】\n\n" +
-                        "• 좌측/우측 패널 각각 [이전] / [다음] 버튼으로 페이지 이동\n" +
-                        "• 한 번 누를 때마다 화면 높이만큼 이동\n\n" +
-                        "• 이 버튼(연동)을 누르면 1페이지/2페이지 초기 배치로 돌아갑니다\n\n" +
-                        "• 예시: A~F 컨텐츠\n" +
-                        "  처음: 좌=A, 우=B\n" +
-                        "  다음 클릭 후: 좌=C, 우=D"
+                        "【웹툰 모드 사용법】\n\n" +
+                        "▼ [이전] / [다음] 버튼\n" +
+                        "  • 어느 쪽 버튼이든 좌/우 동시 이동\n" +
+                        "  • 현재 위치 기준 ±화면 높이만큼 이동\n" +
+                        "  • 연동 ON/OFF 관계없이 항상 동작\n\n" +
+                        "▼ 연동 OFF (기본)\n" +
+                        "  • 각 패널 독립 스크롤 가능\n" +
+                        "  • 버튼 클릭 → 좌=현재+1페이지, 우=좌+1페이지\n\n" +
+                        "▼ 연동 ON\n" +
+                        "  • 좌측 드래그 시 우측이 1페이지 뒤에서 자동 추종\n" +
+                        "  • 버튼 클릭 → 좌 이동 후 우측 자동 따라옴\n\n" +
+                        "예시 (A~F): 처음=좌A/우B → [다음]=좌C/우D → [다음]=좌E/우F"
                     else
                         "【일반 연동】\n\n" +
                         "1. 연동 OFF 상태에서 두 화면을 원하는 위치로 이동\n" +
@@ -360,11 +383,17 @@ class MainActivity : AppCompatActivity() {
                 viewModel.addHistory(browserController.getTitle().ifBlank { url }, url)
                 updateBookmarkIcon(url)
 
-                // 웹툰 모드: 페이지 로드 완료 후 초기 배치 재적용
+                // 웹툰 모드: 페이지 로드 완료 후 배치 재적용
                 if (isWebtoonMode) {
-                    // 슬레이브 로딩도 완료될 시간을 주고 재배치
                     binding.webViewContainer.postDelayed({
-                        browserController.initWebtoonPageMode()
+                        if (browserController.isSyncActive) {
+                            // 연동 ON이었으면 연동 재적용
+                            browserController.lockWebtoonSync()
+                            updateSyncButton(active = true, webtoonMode = true)
+                        } else {
+                            // 연동 OFF면 초기 배치만
+                            browserController.initWebtoonPageMode()
+                        }
                     }, 800)
                 }
 
