@@ -168,6 +168,7 @@ class MainActivity : AppCompatActivity() {
         binding.webtoonNavLeft.visibility  = View.VISIBLE
         binding.webtoonNavRight.visibility = View.VISIBLE
         val settings = viewModel.settings.value ?: BrowserSettings()
+        browserController.webtoonGap = settings.webtoonGap
         applyNavPosition(isLeft = true,  pos = settings.navLeftPos)
         applyNavPosition(isLeft = false, pos = settings.navRightPos)
 
@@ -640,7 +641,8 @@ class MainActivity : AppCompatActivity() {
             "데스크톱 모드: ${if (cur.desktopMode) "켜짐" else "꺼짐"}",
             "⌨️ 한/영 키보드 전환",
             "📖 좌버튼 위치: ${navPosLabel(cur.navLeftPos)}",
-            "📖 우버튼 위치: ${navPosLabel(cur.navRightPos)}"
+            "📖 우버튼 위치: ${navPosLabel(cur.navRightPos)}",
+            "↔️ 좌/우 페이지 간격: ${gapLabel(cur.webtoonGap)}"
         )
         AlertDialog.Builder(this).setTitle("설정")
             .setItems(items) { _, which ->
@@ -660,6 +662,7 @@ class MainActivity : AppCompatActivity() {
                     4 -> switchInputLanguage()
                     5 -> showNavPosDialog(isLeft = true,  cur = cur)
                     6 -> showNavPosDialog(isLeft = false, cur = cur)
+                    7 -> showGapDialog(cur)
                 }
             }
             .setNegativeButton("닫기", null).show()
@@ -671,6 +674,14 @@ class MainActivity : AppCompatActivity() {
         50  -> "중단"
         90  -> "상단"
         else -> "$pos (직접입력)"
+    }
+
+    /** webtoonGap 값(0~100)을 라벨로 변환 */
+    private fun gapLabel(gap: Int): String = when (gap) {
+        0   -> "0 (같은 페이지)"
+        50  -> "50 (기본 · 한 페이지 차)"
+        100 -> "100 (두 페이지 차)"
+        else -> "$gap"
     }
 
     /**
@@ -750,6 +761,69 @@ class MainActivity : AppCompatActivity() {
             // 전환 실패 시 시스템 IME 선택 다이얼로그 열기
             imm.showInputMethodPicker()
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 좌/우 페이지 간격 설정
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * 좌/우 페이지 간격 선택 다이얼로그.
+     * 0(같은 페이지) / 50(기본 한 페이지) / 100(두 페이지) / 직접 입력(0~100)
+     */
+    private fun showGapDialog(cur: BrowserSettings) {
+        val presets = listOf(
+            "0  ─ 같은 페이지 (좌=A, 우=A)"  to 0,
+            "50 ─ 기본값 (좌=A, 우=B)"        to 50,
+            "100 ─ 두 페이지 차 (좌=A, 우=C)" to 100,
+            "직접 입력 (0~100)"                to -1
+        )
+        val labels     = presets.map { it.first }.toTypedArray()
+        val checkedIdx = presets.indexOfFirst { it.second == cur.webtoonGap }.takeIf { it >= 0 }
+                         ?: (presets.size - 1)
+
+        AlertDialog.Builder(this)
+            .setTitle("↔️ 좌/우 페이지 간격")
+            .setMessage("0=같은 페이지  ·  50=한 페이지 차(기본)  ·  100=두 페이지 차")
+            .setSingleChoiceItems(labels, checkedIdx) { dialog, which ->
+                val chosen = presets[which].second
+                if (chosen >= 0) {
+                    applyAndSaveGap(chosen, cur)
+                    dialog.dismiss()
+                } else {
+                    dialog.dismiss()
+                    val et = android.widget.EditText(this).apply {
+                        inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                        setText(cur.webtoonGap.toString())
+                        hint = "0 ~ 100"
+                    }
+                    AlertDialog.Builder(this)
+                        .setTitle("간격 직접 입력")
+                        .setMessage("0(같은 페이지) ~ 100(두 페이지 차) 사이 숫자")
+                        .setView(et)
+                        .setPositiveButton("적용") { _, _ ->
+                            val v = et.text.toString().toIntOrNull()?.coerceIn(0, 100) ?: cur.webtoonGap
+                            applyAndSaveGap(v, cur)
+                        }
+                        .setNegativeButton("취소", null)
+                        .show()
+                }
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    /** 간격 설정 저장 + 컨트롤러에 즉시 반영 + 웹툰 배치 재적용 */
+    private fun applyAndSaveGap(gap: Int, cur: BrowserSettings) {
+        viewModel.updateSettings(cur.copy(webtoonGap = gap))
+        browserController.webtoonGap = gap
+        if (isWebtoonMode) {
+            binding.webViewContainer.post {
+                if (browserController.isSyncActive) browserController.lockWebtoonSync()
+                else                                 browserController.initWebtoonPageMode()
+            }
+        }
+        Toast.makeText(this, "↔️ 간격 $gap 적용됨", Toast.LENGTH_SHORT).show()
     }
 
     // ─────────────────────────────────────────────────────────────

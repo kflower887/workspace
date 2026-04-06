@@ -43,6 +43,18 @@ class FoldableBrowserController(private val context: Context) {
     var isWebtoonSyncMode: Boolean = false
         private set
 
+    /**
+     * 좌/우 페이지 간격 (0~100, 기본 50).
+     * gapOffset(px) = (webtoonGap / 50.0) * panelH
+     *   0  → 우=좌 (같은 페이지)
+     *   50 → 우=좌+1panelH (기본, 한 페이지 차)
+     *   100→ 우=좌+2panelH (두 페이지 차)
+     */
+    var webtoonGap: Int = 50
+
+    /** webtoonGap → px 변환 */
+    private fun gapOffset(panelH: Int): Int = ((webtoonGap / 50.0) * panelH).toInt()
+
     var onPageStarted: ((url: String) -> Unit)? = null
     var onPageFinished: ((url: String) -> Unit)? = null
     var onTitleReceived: ((title: String) -> Unit)? = null
@@ -68,8 +80,9 @@ class FoldableBrowserController(private val context: Context) {
         val panelH = left.height
         if (panelH == 0) { left.post { initWebtoonPageMode() }; return }
 
+        val gap = gapOffset(panelH)
         left.scrollTo(0, 0)
-        right.post { right.scrollTo(0, panelH) }
+        right.post { right.scrollTo(0, gap) }
     }
 
     /**
@@ -82,10 +95,9 @@ class FoldableBrowserController(private val context: Context) {
         val right  = webViews.getOrNull(1) ?: return
         val panelH = left.height.takeIf { it > 0 } ?: return
 
-        // 우측 offset = panelH (항상 좌측보다 한 화면 뒤)
-        right.lockedOffsetFromMaster = panelH
-        // 즉시 우측 위치도 맞춤
-        right.scrollTo(0, (left.scrollY + panelH).coerceAtLeast(0))
+        val gap = gapOffset(panelH)
+        right.lockedOffsetFromMaster = gap
+        right.scrollTo(0, (left.scrollY + gap).coerceAtLeast(0))
         isSyncActive = true
         isWebtoonSyncMode = true
     }
@@ -119,11 +131,12 @@ class FoldableBrowserController(private val context: Context) {
         val panelH = left.height.takeIf { it > 0 } ?: return
 
         // 현재 좌측 위치를 panelH 단위로 snap한 뒤 +1 페이지쌍 (짝수 단위)
-        val curIndex  = left.scrollY / panelH          // 현재 몇 번째 panelH 단위인지
-        val nextIndex = (curIndex / 2 + 1) * 2         // 다음 짝수 index (2, 4, 6…)
+        val gap       = gapOffset(panelH)
+        val curIndex  = left.scrollY / panelH
+        val nextIndex = (curIndex / 2 + 1) * 2
         val newLeftY  = nextIndex * panelH
 
-        applyBothPanels(left, right, newLeftY, panelH)
+        applyBothPanels(left, right, newLeftY, gap)
     }
 
     /**
@@ -135,28 +148,27 @@ class FoldableBrowserController(private val context: Context) {
         val panelH = left.height.takeIf { it > 0 } ?: return
 
         // 현재 좌측 위치를 panelH 단위로 snap한 뒤 -1 페이지쌍 (짝수 단위)
+        val gap       = gapOffset(panelH)
         val curIndex  = left.scrollY / panelH
-        // 현재 짝수 기준 index — 정확히 경계에 있으면 한 단계 더 내림
         val baseIndex = if (left.scrollY % panelH == 0 && curIndex % 2 == 0) curIndex
                         else (curIndex / 2) * 2
         val prevIndex = (baseIndex - 2).coerceAtLeast(0)
         val newLeftY  = prevIndex * panelH
 
-        applyBothPanels(left, right, newLeftY, panelH)
+        applyBothPanels(left, right, newLeftY, gap)
     }
 
-    /** 좌/우 패널을 newLeftY / newLeftY+panelH 로 이동 (연동 상태 반영) */
+    /** 좌/우 패널을 newLeftY / newLeftY+gap(px) 으로 이동 (연동 상태 반영) */
     private fun applyBothPanels(
         left: SyncScrollWebView, right: SyncScrollWebView,
-        newLeftY: Int, panelH: Int
+        newLeftY: Int, gap: Int
     ) {
         left.scrollTo(0, newLeftY)
         if (isSyncActive) {
             // 연동 ON: onScrollChanged 콜백이 우측 자동 이동
-            // scrollTo 는 동기이므로 콜백이 즉시 호출됨 — 추가 처리 불필요
         } else {
             // 연동 OFF: 우측 직접 이동
-            right.scrollTo(0, newLeftY + panelH)
+            right.scrollTo(0, newLeftY + gap)
         }
     }
 

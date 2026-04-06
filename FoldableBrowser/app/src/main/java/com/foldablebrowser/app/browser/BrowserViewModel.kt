@@ -27,7 +27,10 @@ data class BrowserSettings(
     val desktopMode: Boolean = false,
     // 웹툰 네비 버튼 수직 위치 (1=최하단 ~ 100=최상단, 기본 하단=10, 상단=90, 중단=50)
     val navLeftPos: Int  = 10,
-    val navRightPos: Int = 10
+    val navRightPos: Int = 10,
+    // 좌/우 페이지 간격 (0=같은페이지 ~ 100=두페이지차, 기본 50=한페이지차)
+    // offset(px) = (webtoonGap / 50.0) * panelHeight
+    val webtoonGap: Int = 50
 )
 
 /**
