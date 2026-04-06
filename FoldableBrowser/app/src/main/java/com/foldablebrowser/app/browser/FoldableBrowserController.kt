@@ -218,6 +218,9 @@ class FoldableBrowserController(private val context: Context) {
             }
             scrollBarStyle = WebView.SCROLLBARS_OUTSIDE_OVERLAY
             isScrollbarFadingEnabled = true
+            // 터치 시 포커스 획득 → 소프트 키보드 정상 동작
+            isFocusable = true
+            isFocusableInTouchMode = true
 
             if (panelIndex == 0) {
                 onScrollChangedListener = { masterScrollY ->

@@ -7,7 +7,6 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
-import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsetsController
 import android.view.inputmethod.EditorInfo
@@ -92,7 +91,6 @@ class MainActivity : AppCompatActivity() {
         setupNavigationButtons()
         setupBottomBar()
         setupTopControls()
-        setupFullscreenTapToRestore()
         observeViewModel()
 
         // 웹툰 컨테이너는 사용 안 함 (DUAL 모드 기반으로 전환)
@@ -754,7 +752,7 @@ class MainActivity : AppCompatActivity() {
         updateFullscreenButton(true)
 
         // 상단 힌트 표시 후 자동 페이드아웃
-        showFullscreenHint("⛶ 전체화면  |  탭하거나 ← 뒤로를 눌러 복귀")
+        showFullscreenHint("⛶ 전체화면  |  ← 뒤로 또는 ⛶ 버튼으로 복귀")
     }
 
     /** 전체화면 해제 */
@@ -791,17 +789,6 @@ class MainActivity : AppCompatActivity() {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
-    }
-
-    /** 전체화면에서 콘텐츠 탭 시 UI 복귀 처리 */
-    private fun setupFullscreenTapToRestore() {
-        // contentFrame(WebView 영역) 탭 감지
-        binding.contentFrame.setOnTouchListener { _, event ->
-            if (isFullscreen && event.action == MotionEvent.ACTION_UP) {
-                exitFullscreen()
-            }
-            false   // 이벤트 소비 안 함 → WebView 터치도 정상 동작
         }
     }
 
