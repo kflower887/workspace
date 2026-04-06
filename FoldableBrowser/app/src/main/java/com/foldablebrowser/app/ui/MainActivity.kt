@@ -4,9 +4,12 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
+import android.view.WindowInsetsController
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
@@ -15,6 +18,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.foldablebrowser.app.R
 import com.foldablebrowser.app.browser.BrowserSettings
 import com.foldablebrowser.app.browser.BrowserViewModel
@@ -43,6 +49,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var browserController: FoldableBrowserController
 
     private var isWebtoonMode = false
+    private var isFullscreen  = false
+
+    // 전체화면 시 UI 자동 복귀 Runnable
+    private val fullscreenHintHideRunnable = Runnable {
+        binding.fullscreenHint.animate().alpha(0f).setDuration(400).withEndAction {
+            binding.fullscreenHint.visibility = View.GONE
+        }.start()
+    }
 
     private val tabManagerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -78,6 +92,7 @@ class MainActivity : AppCompatActivity() {
         setupNavigationButtons()
         setupBottomBar()
         setupTopControls()
+        setupFullscreenTapToRestore()
         observeViewModel()
 
         // 웹툰 컨테이너는 사용 안 함 (DUAL 모드 기반으로 전환)
@@ -110,6 +125,7 @@ class MainActivity : AppCompatActivity() {
 
     @Suppress("OVERRIDE_DEPRECATION")
     override fun onBackPressed() {
+        if (isFullscreen) { exitFullscreen(); return }
         if (browserController.goBack()) return
         @Suppress("DEPRECATION")
         super.onBackPressed()
@@ -118,6 +134,12 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         browserController.destroy()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // 다이얼로그/알림 등으로 포커스 잃었다가 복귀할 때 전체화면 유지
+        if (hasFocus && isFullscreen) applyImmersive()
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -328,8 +350,14 @@ class MainActivity : AppCompatActivity() {
                 ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         }
 
+        // ── 전체화면 버튼 ──
+        binding.btnFullscreen.setOnClickListener {
+            if (isFullscreen) exitFullscreen() else enterFullscreen()
+        }
+
         updateSyncButton(active = false, webtoonMode = false)
         updateWebtoonButton(false)
+        updateFullscreenButton(false)
     }
 
     private fun updateSyncButton(active: Boolean, webtoonMode: Boolean) {
@@ -701,6 +729,96 @@ class MainActivity : AppCompatActivity() {
                 5 -> showSettingsDialog()
             }
         }.show()
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 전체화면 모드
+    // ─────────────────────────────────────────────────────────────
+
+    /** 전체화면 진입: 상단/하단 UI 숨김 + 상태바/네비바 immersive 숨김 */
+    private fun enterFullscreen() {
+        isFullscreen = true
+
+        // 앱 UI 숨김 (애니메이션)
+        binding.topToolbar.animate().translationY(-binding.topToolbar.height.toFloat())
+            .setDuration(250).withEndAction { binding.topToolbar.visibility = View.GONE }.start()
+        binding.controlBar.animate().translationY(-binding.controlBar.height.toFloat())
+            .setDuration(250).withEndAction { binding.controlBar.visibility = View.GONE }.start()
+        binding.bottomNavBar.animate().translationY(binding.bottomNavBar.height.toFloat())
+            .setDuration(250).withEndAction { binding.bottomNavBar.visibility = View.GONE }.start()
+
+        // 시스템 UI 숨김 (상태바 + 네비게이션바)
+        applyImmersive()
+
+        // 웹툰 네비 버튼은 전체화면에서도 유지
+        updateFullscreenButton(true)
+
+        // 상단 힌트 표시 후 자동 페이드아웃
+        showFullscreenHint("⛶ 전체화면  |  탭하거나 ← 뒤로를 눌러 복귀")
+    }
+
+    /** 전체화면 해제 */
+    private fun exitFullscreen() {
+        isFullscreen = false
+
+        // 앱 UI 복귀
+        binding.topToolbar.visibility = View.VISIBLE
+        binding.topToolbar.translationY = -binding.topToolbar.height.toFloat()
+        binding.topToolbar.animate().translationY(0f).setDuration(250).start()
+
+        binding.controlBar.visibility = View.VISIBLE
+        binding.controlBar.translationY = -binding.controlBar.height.toFloat()
+        binding.controlBar.animate().translationY(0f).setDuration(250).start()
+
+        binding.bottomNavBar.visibility = View.VISIBLE
+        binding.bottomNavBar.translationY = binding.bottomNavBar.height.toFloat()
+        binding.bottomNavBar.animate().translationY(0f).setDuration(250).start()
+
+        // 시스템 UI 복귀
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+        WindowInsetsControllerCompat(window, binding.root).apply {
+            show(WindowInsetsCompat.Type.systemBars())
+        }
+
+        binding.fullscreenHint.visibility = View.GONE
+        updateFullscreenButton(false)
+    }
+
+    /** Immersive 모드 적용 (시스템 바 완전 숨김, 스와이프로 임시 표시) */
+    private fun applyImmersive() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, binding.root).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
+    /** 전체화면에서 콘텐츠 탭 시 UI 복귀 처리 */
+    private fun setupFullscreenTapToRestore() {
+        // contentFrame(WebView 영역) 탭 감지
+        binding.contentFrame.setOnTouchListener { _, event ->
+            if (isFullscreen && event.action == MotionEvent.ACTION_UP) {
+                exitFullscreen()
+            }
+            false   // 이벤트 소비 안 함 → WebView 터치도 정상 동작
+        }
+    }
+
+    /** 전체화면 힌트 토스트(상단 오버레이) 표시 후 자동 숨김 */
+    private fun showFullscreenHint(msg: String) {
+        binding.fullscreenHint.removeCallbacks(fullscreenHintHideRunnable)
+        binding.fullscreenHint.text = msg
+        binding.fullscreenHint.alpha = 1f
+        binding.fullscreenHint.visibility = View.VISIBLE
+        binding.fullscreenHint.postDelayed(fullscreenHintHideRunnable, 2500)
+    }
+
+    /** 전체화면 버튼 아이콘 갱신 */
+    private fun updateFullscreenButton(fullscreen: Boolean) {
+        binding.btnFullscreen.setImageResource(
+            if (fullscreen) R.drawable.ic_fullscreen_exit else R.drawable.ic_fullscreen
+        )
     }
 
     // ─────────────────────────────────────────────────────────────

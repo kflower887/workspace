@@ -190,6 +190,18 @@
             android:src="@drawable/ic_rotate"
             android:padding="4dp" />
 
+        <View android:layout_width="6dp" android:layout_height="1dp" />
+
+        <!-- 전체화면 버튼 -->
+        <ImageButton
+            android:id="@+id/btnFullscreen"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:background="@drawable/btn_control_bg"
+            android:contentDescription="전체화면"
+            android:src="@drawable/ic_fullscreen"
+            android:padding="4dp" />
+
     </LinearLayout>
 
     <!-- ── 로딩 프로그레스 ── -->
@@ -260,6 +272,25 @@
              └─────────────────────────┴──────────────────────────┘
              어느 버튼을 눌러도 좌/우 양쪽 동시에 페이지 이동
         ══════════════════════════════════════════════════════ -->
+
+        <!-- ══ 전체화면 모드 복귀 힌트 오버레이 ══
+             전체화면 ON 시에만 visible. 탭하면 UI 복귀 -->
+        <TextView
+            android:id="@+id/fullscreenHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="8dp"
+            android:background="#99000000"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:text="화면을 탭하면 UI가 나타납니다"
+            android:textColor="#FFFFFFFF"
+            android:textSize="12sp"
+            android:visibility="gone"
+            android:elevation="12dp" />
 
         <!-- 좌패널 버튼 오버레이 (좌측 하단) -->
         <LinearLayout
