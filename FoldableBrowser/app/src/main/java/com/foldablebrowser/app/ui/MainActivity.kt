@@ -138,8 +138,9 @@ class MainActivity : AppCompatActivity() {
             browserController.initWebtoonPageMode()
         }
 
-        // 네비게이션 오버레이 버튼 표시
-        binding.webtoonNavOverlay.visibility = View.VISIBLE
+        // 좌/우 네비게이션 오버레이 버튼 표시
+        binding.webtoonNavLeft.visibility  = View.VISIBLE
+        binding.webtoonNavRight.visibility = View.VISIBLE
 
         updateWebtoonButton(true)
         Toast.makeText(
@@ -157,8 +158,9 @@ class MainActivity : AppCompatActivity() {
         browserController.disableWebtoonSync()
         updateSyncButton(active = false, webtoonMode = false)
         updateWebtoonButton(false)
-        // 네비게이션 오버레이 버튼 숨김
-        binding.webtoonNavOverlay.visibility = View.GONE
+        // 좌/우 네비게이션 오버레이 버튼 숨김
+        binding.webtoonNavLeft.visibility  = View.GONE
+        binding.webtoonNavRight.visibility = View.GONE
         Toast.makeText(this, "웹툰 모드 OFF", Toast.LENGTH_SHORT).show()
     }
 
@@ -285,11 +287,11 @@ class MainActivity : AppCompatActivity() {
             if (isWebtoonMode) disableWebtoonMode() else enableWebtoonMode()
         }
 
-        // ── 웹툰 페이지 네비게이션 버튼 ──
-        binding.btnLeftPrev.setOnClickListener  { browserController.leftPagePrev()  }
-        binding.btnLeftNext.setOnClickListener  { browserController.leftPageNext()  }
-        binding.btnRightPrev.setOnClickListener { browserController.rightPagePrev() }
-        binding.btnRightNext.setOnClickListener { browserController.rightPageNext() }
+        // ── 웹툰 페이지 네비게이션 버튼 (좌/우 어디서 눌러도 동일하게 양쪽 동시 이동) ──
+        binding.btnLeftPrev.setOnClickListener  { browserController.webtoonPagePrev() }
+        binding.btnLeftNext.setOnClickListener  { browserController.webtoonPageNext() }
+        binding.btnRightPrev.setOnClickListener { browserController.webtoonPagePrev() }
+        binding.btnRightNext.setOnClickListener { browserController.webtoonPageNext() }
 
         // ── 플랫폼 버튼 숨김 (웹툰 모드 재설계로 불필요) ──
         binding.btnPlatform.visibility = View.GONE

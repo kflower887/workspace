@@ -251,107 +251,97 @@
         </FrameLayout>
 
         <!-- ══════════════════════════════════════════════════════
-             웹툰 페이지 네비게이션 오버레이
-             웹툰 모드 ON 시에만 visible
-        ══════════════════════════════════════════════════════════ -->
+             웹툰 페이지 네비게이션 오버레이 (웹툰 모드 ON 시만 visible)
+
+             ┌─────────────────────────┬──────────────────────────┐
+             │ 좌패널                  │                  우패널  │
+             │ [▲이전]                 │                 [▲이전]  │
+             │ [▼다음]   ← 좌하단      │    우하단 →     [▼다음]  │
+             └─────────────────────────┴──────────────────────────┘
+             어느 버튼을 눌러도 좌/우 양쪽 동시에 페이지 이동
+        ══════════════════════════════════════════════════════ -->
+
+        <!-- 좌패널 버튼 오버레이 (좌측 하단) -->
         <LinearLayout
-            android:id="@+id/webtoonNavOverlay"
-            android:layout_width="match_parent"
+            android:id="@+id/webtoonNavLeft"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
-            android:orientation="horizontal"
+            android:layout_gravity="bottom|start"
+            android:layout_marginStart="8dp"
+            android:layout_marginBottom="16dp"
+            android:orientation="vertical"
             android:visibility="gone"
-            android:elevation="8dp">
+            android:elevation="10dp">
 
-            <!-- 좌측 패널 네비 -->
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="horizontal"
+            <!-- 이전 버튼 -->
+            <TextView
+                android:id="@+id/btnLeftPrev"
+                android:layout_width="110dp"
+                android:layout_height="52dp"
+                android:background="@drawable/webtoon_nav_btn_bg"
                 android:gravity="center"
-                android:paddingBottom="12dp"
-                android:paddingTop="8dp">
+                android:text="▲  이전"
+                android:textColor="#FFFFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:alpha="0.80" />
 
-                <!-- 좌측 이전 버튼 -->
-                <TextView
-                    android:id="@+id/btnLeftPrev"
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:background="@drawable/webtoon_nav_btn_bg"
-                    android:gravity="center"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp"
-                    android:text="◀ 이전"
-                    android:textColor="#FFFFFF"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
+            <View android:layout_width="1dp" android:layout_height="6dp" />
 
-                <View android:layout_width="10dp" android:layout_height="1dp" />
-
-                <!-- 좌측 다음 버튼 -->
-                <TextView
-                    android:id="@+id/btnLeftNext"
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:background="@drawable/webtoon_nav_btn_bg"
-                    android:gravity="center"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp"
-                    android:text="다음 ▶"
-                    android:textColor="#FFFFFF"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-
-            </LinearLayout>
-
-            <!-- 패널 구분선 (2px) -->
-            <View
-                android:layout_width="2dp"
-                android:layout_height="match_parent"
-                android:background="@color/divider_color" />
-
-            <!-- 우측 패널 네비 -->
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="horizontal"
+            <!-- 다음 버튼 -->
+            <TextView
+                android:id="@+id/btnLeftNext"
+                android:layout_width="110dp"
+                android:layout_height="52dp"
+                android:background="@drawable/webtoon_nav_btn_bg"
                 android:gravity="center"
-                android:paddingBottom="12dp"
-                android:paddingTop="8dp">
+                android:text="▼  다음"
+                android:textColor="#FFFFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:alpha="0.80" />
 
-                <!-- 우측 이전 버튼 -->
-                <TextView
-                    android:id="@+id/btnRightPrev"
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:background="@drawable/webtoon_nav_btn_bg"
-                    android:gravity="center"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp"
-                    android:text="◀ 이전"
-                    android:textColor="#FFFFFF"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
+        </LinearLayout>
 
-                <View android:layout_width="10dp" android:layout_height="1dp" />
+        <!-- 우패널 버튼 오버레이 (우측 하단) -->
+        <LinearLayout
+            android:id="@+id/webtoonNavRight"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="16dp"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:elevation="10dp">
 
-                <!-- 우측 다음 버튼 -->
-                <TextView
-                    android:id="@+id/btnRightNext"
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:background="@drawable/webtoon_nav_btn_bg"
-                    android:gravity="center"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp"
-                    android:text="다음 ▶"
-                    android:textColor="#FFFFFF"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
+            <!-- 이전 버튼 -->
+            <TextView
+                android:id="@+id/btnRightPrev"
+                android:layout_width="110dp"
+                android:layout_height="52dp"
+                android:background="@drawable/webtoon_nav_btn_bg"
+                android:gravity="center"
+                android:text="▲  이전"
+                android:textColor="#FFFFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:alpha="0.80" />
 
-            </LinearLayout>
+            <View android:layout_width="1dp" android:layout_height="6dp" />
+
+            <!-- 다음 버튼 -->
+            <TextView
+                android:id="@+id/btnRightNext"
+                android:layout_width="110dp"
+                android:layout_height="52dp"
+                android:background="@drawable/webtoon_nav_btn_bg"
+                android:gravity="center"
+                android:text="▼  다음"
+                android:textColor="#FFFFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:alpha="0.80" />
 
         </LinearLayout>
 

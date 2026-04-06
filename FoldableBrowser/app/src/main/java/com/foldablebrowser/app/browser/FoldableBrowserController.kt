@@ -45,57 +45,72 @@ class FoldableBrowserController(private val context: Context) {
     var onReceivedIcon: ((icon: Bitmap?) -> Unit)? = null
 
     // ──────────────────────────────────────────────────────────────
-    // 웹툰 페이지 버튼 네비게이션 (연동 없이 패널별 독립 이동)
+    // 웹툰 페이지 버튼 네비게이션 (좌/우 동시 연동 이동)
     // ──────────────────────────────────────────────────────────────
+    //
+    // 콘텐츠가 A~F 일 때 (패널 높이 = 1페이지 높이):
+    //   pageIndex=0 → 좌=A(scrollY=0),        우=B(scrollY=panelH)
+    //   pageIndex=1 → 좌=C(scrollY=2*panelH), 우=D(scrollY=3*panelH)
+    //   pageIndex=2 → 좌=E(scrollY=4*panelH), 우=F(scrollY=5*panelH)
+    //
+    // 어느 쪽 [이전]/[다음] 버튼을 눌러도 양쪽 동시에 2페이지씩 이동.
+    // ──────────────────────────────────────────────────────────────
+
+    /** 현재 페이지 쌍 인덱스 (0=A/B, 1=C/D, 2=E/F …) */
+    private var webtoonPageIndex: Int = 0
 
     /**
      * 웹툰 버튼 모드 초기화.
-     * - 연동 완전 해제
-     * - 좌측(0): scrollY = 0 (1페이지 상단)
-     * - 우측(1): scrollY = panelHeight (2페이지 상단, 즉 좌측 바로 다음)
-     * 이후 좌/우 각각 독립적으로 버튼으로 페이지를 넘긴다.
+     * - 연동 완전 해제 (각 패널 독립 스크롤)
+     * - 좌=0페이지(scrollY=0), 우=1페이지(scrollY=panelH)
      */
     fun initWebtoonPageMode() {
-        // 연동 해제 → 각 패널 독립
         webViews.forEach { it.lockedOffsetFromMaster = null }
         isSyncActive = false
         isWebtoonSyncMode = false
+        webtoonPageIndex = 0
 
-        val master = webViews.getOrNull(0) ?: return
-        val slave  = webViews.getOrNull(1) ?: return
+        val left  = webViews.getOrNull(0) ?: return
+        val right = webViews.getOrNull(1) ?: return
+        val panelH = left.height
+        if (panelH == 0) { left.post { initWebtoonPageMode() }; return }
 
-        val panelH = master.height
-        if (panelH == 0) {
-            master.post { initWebtoonPageMode() }
-            return
-        }
-
-        // 좌측: 1페이지(맨 위)
-        master.scrollTo(0, 0)
-        // 우측: 2페이지(패널 높이만큼 아래)
-        slave.post { slave.scrollTo(0, panelH) }
+        left.scrollTo(0, 0)
+        right.post { right.scrollTo(0, panelH) }
     }
 
     /**
-     * 특정 패널을 pageStep 만큼 이동 (pageStep = 패널 높이 배수).
-     * direction > 0 이면 다음, < 0 이면 이전.
+     * 다음 페이지 쌍으로 이동 (좌/우 동시).
+     * pageIndex += 1 → 좌 scrollY = 2n*panelH, 우 scrollY = (2n+1)*panelH
      */
-    fun panelPageStep(panelIndex: Int, direction: Int) {
-        val wv = webViews.getOrNull(panelIndex) ?: return
-        val panelH = wv.height.takeIf { it > 0 } ?: return
-        val currentY = wv.scrollY
-        val newY = (currentY + direction * panelH).coerceAtLeast(0)
-        wv.scrollTo(0, newY)
+    fun webtoonPageNext() {
+        val left   = webViews.getOrNull(0) ?: return
+        val right  = webViews.getOrNull(1) ?: return
+        val panelH = left.height.takeIf { it > 0 } ?: return
+        webtoonPageIndex++
+        scrollBothPanels(left, right, panelH)
     }
 
-    /** 좌측 패널 다음 페이지 */
-    fun leftPageNext()  = panelPageStep(0, +1)
-    /** 좌측 패널 이전 페이지 */
-    fun leftPagePrev()  = panelPageStep(0, -1)
-    /** 우측 패널 다음 페이지 */
-    fun rightPageNext() = panelPageStep(1, +1)
-    /** 우측 패널 이전 페이지 */
-    fun rightPagePrev() = panelPageStep(1, -1)
+    /**
+     * 이전 페이지 쌍으로 이동 (좌/우 동시).
+     */
+    fun webtoonPagePrev() {
+        val left   = webViews.getOrNull(0) ?: return
+        val right  = webViews.getOrNull(1) ?: return
+        val panelH = left.height.takeIf { it > 0 } ?: return
+        if (webtoonPageIndex > 0) webtoonPageIndex--
+        scrollBothPanels(left, right, panelH)
+    }
+
+    private fun scrollBothPanels(left: SyncScrollWebView, right: SyncScrollWebView, panelH: Int) {
+        val leftY  = webtoonPageIndex * 2 * panelH
+        val rightY = leftY + panelH
+        left.scrollTo(0, leftY)
+        right.scrollTo(0, rightY)
+    }
+
+    /** 현재 페이지 인덱스 (UI 표시용) */
+    fun getWebtoonPageIndex() = webtoonPageIndex
 
     // ──────────────────────────────────────────────────────────────
     // 웹툰 자동 연동 (레거시 - 연동 ON/OFF 방식)
