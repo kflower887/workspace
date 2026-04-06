@@ -96,10 +96,10 @@ class MainActivity : AppCompatActivity() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         rearrangePanels()
-        // 화면 회전 시 웹툰 모드면 오프셋 재계산 (패널 높이가 바뀔 수 있음)
+        // 화면 회전 시 웹툰 모드면 패널 높이 재기준으로 재배치
         if (isWebtoonMode) {
             binding.webViewContainer.post {
-                browserController.enableWebtoonSync()
+                browserController.initWebtoonPageMode()
             }
         }
     }
@@ -130,22 +130,23 @@ class MainActivity : AppCompatActivity() {
             applyMode(FoldableMode.DUAL, loadUrl = true)
         }
 
-        // 연동 버튼 상태 업데이트
+        // 연동 버튼 숨김 (웹툰 모드에서는 버튼 네비게이션 사용)
         updateSyncButton(active = false, webtoonMode = true)
 
-        // 패널 레이아웃 완료 후 자동 오프셋 활성화
+        // 패널 레이아웃 완료 후 페이지 초기 배치
         binding.webViewContainer.post {
-            browserController.enableWebtoonSync()
-            updateSyncButton(active = true, webtoonMode = true)
+            browserController.initWebtoonPageMode()
         }
+
+        // 네비게이션 오버레이 버튼 표시
+        binding.webtoonNavOverlay.visibility = View.VISIBLE
 
         updateWebtoonButton(true)
         Toast.makeText(
             this,
             "📖 웹툰 모드 ON\n" +
             "좌측 = 1페이지 / 우측 = 2페이지\n" +
-            "좌측을 스크롤하면 우측이 자동으로 이어집니다\n" +
-            "(연동 버튼으로 오프셋 수동 조정 가능)",
+            "하단 [이전/다음] 버튼으로 페이지를 넘기세요",
             Toast.LENGTH_LONG
         ).show()
     }
@@ -156,6 +157,8 @@ class MainActivity : AppCompatActivity() {
         browserController.disableWebtoonSync()
         updateSyncButton(active = false, webtoonMode = false)
         updateWebtoonButton(false)
+        // 네비게이션 오버레이 버튼 숨김
+        binding.webtoonNavOverlay.visibility = View.GONE
         Toast.makeText(this, "웹툰 모드 OFF", Toast.LENGTH_SHORT).show()
     }
 
@@ -226,17 +229,9 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (isWebtoonMode) {
-                // 웹툰 모드: 연동 ON/OFF 전환 또는 오프셋 재계산
-                if (browserController.isSyncActive) {
-                    browserController.disableWebtoonSync()
-                    updateSyncButton(active = false, webtoonMode = true)
-                    Toast.makeText(this, "🔓 웹툰 연동 해제\n각 화면을 원하는 위치로 이동 후\n버튼을 다시 눌러 연동하세요", Toast.LENGTH_LONG).show()
-                } else {
-                    browserController.enableWebtoonSync()
-                    updateSyncButton(active = true, webtoonMode = true)
-                    val panelH = browserController.getMasterView()?.height ?: 0
-                    Toast.makeText(this, "🔗 웹툰 연동 ON\n우측은 좌측에서 ${panelH}px 뒤부터 표시됩니다", Toast.LENGTH_SHORT).show()
-                }
+                // 웹툰 버튼 모드: 연동 초기화 (1페이지/2페이지 재배치)
+                browserController.initWebtoonPageMode()
+                Toast.makeText(this, "📖 웹툰 초기화\n좌=1페이지, 우=2페이지로 재배치했습니다", Toast.LENGTH_SHORT).show()
             } else {
                 // 일반 모드: 현재 위치 기준 잠금
                 if (browserController.isSyncActive) {
@@ -266,12 +261,13 @@ class MainActivity : AppCompatActivity() {
                 .setTitle("📌 스크롤 연동 사용법")
                 .setMessage(
                     if (isWebtoonMode)
-                        "【웹툰 모드 연동】\n\n" +
-                        "• 웹툰 모드 ON 시 자동으로 연동됩니다\n" +
-                        "  좌측 = 1페이지, 우측 = 2페이지\n\n" +
-                        "• 연동 해제 후 두 화면을 원하는 위치로 이동한 뒤\n" +
-                        "  [연동 ON]을 눌러 수동으로 위치를 고정할 수도 있습니다\n\n" +
-                        "• 새 페이지 로드 시 자동으로 오프셋이 재계산됩니다"
+                        "【웹툰 모드 버튼 네비게이션】\n\n" +
+                        "• 좌측/우측 패널 각각 [이전] / [다음] 버튼으로 페이지 이동\n" +
+                        "• 한 번 누를 때마다 화면 높이만큼 이동\n\n" +
+                        "• 이 버튼(연동)을 누르면 1페이지/2페이지 초기 배치로 돌아갑니다\n\n" +
+                        "• 예시: A~F 컨텐츠\n" +
+                        "  처음: 좌=A, 우=B\n" +
+                        "  다음 클릭 후: 좌=C, 우=D"
                     else
                         "【일반 연동】\n\n" +
                         "1. 연동 OFF 상태에서 두 화면을 원하는 위치로 이동\n" +
@@ -288,6 +284,12 @@ class MainActivity : AppCompatActivity() {
         binding.btnWebtoonMode.setOnClickListener {
             if (isWebtoonMode) disableWebtoonMode() else enableWebtoonMode()
         }
+
+        // ── 웹툰 페이지 네비게이션 버튼 ──
+        binding.btnLeftPrev.setOnClickListener  { browserController.leftPagePrev()  }
+        binding.btnLeftNext.setOnClickListener  { browserController.leftPageNext()  }
+        binding.btnRightPrev.setOnClickListener { browserController.rightPagePrev() }
+        binding.btnRightNext.setOnClickListener { browserController.rightPageNext() }
 
         // ── 플랫폼 버튼 숨김 (웹툰 모드 재설계로 불필요) ──
         binding.btnPlatform.visibility = View.GONE
@@ -356,12 +358,11 @@ class MainActivity : AppCompatActivity() {
                 viewModel.addHistory(browserController.getTitle().ifBlank { url }, url)
                 updateBookmarkIcon(url)
 
-                // 웹툰 모드: 페이지 로드 완료 후 자동 오프셋 재적용
+                // 웹툰 모드: 페이지 로드 완료 후 초기 배치 재적용
                 if (isWebtoonMode) {
-                    // 슬레이브 로딩도 완료될 시간을 주고 재적용
+                    // 슬레이브 로딩도 완료될 시간을 주고 재배치
                     binding.webViewContainer.postDelayed({
-                        browserController.enableWebtoonSync()
-                        updateSyncButton(active = true, webtoonMode = true)
+                        browserController.initWebtoonPageMode()
                     }, 800)
                 }
 

@@ -45,7 +45,60 @@ class FoldableBrowserController(private val context: Context) {
     var onReceivedIcon: ((icon: Bitmap?) -> Unit)? = null
 
     // ──────────────────────────────────────────────────────────────
-    // 웹툰 자동 연동
+    // 웹툰 페이지 버튼 네비게이션 (연동 없이 패널별 독립 이동)
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * 웹툰 버튼 모드 초기화.
+     * - 연동 완전 해제
+     * - 좌측(0): scrollY = 0 (1페이지 상단)
+     * - 우측(1): scrollY = panelHeight (2페이지 상단, 즉 좌측 바로 다음)
+     * 이후 좌/우 각각 독립적으로 버튼으로 페이지를 넘긴다.
+     */
+    fun initWebtoonPageMode() {
+        // 연동 해제 → 각 패널 독립
+        webViews.forEach { it.lockedOffsetFromMaster = null }
+        isSyncActive = false
+        isWebtoonSyncMode = false
+
+        val master = webViews.getOrNull(0) ?: return
+        val slave  = webViews.getOrNull(1) ?: return
+
+        val panelH = master.height
+        if (panelH == 0) {
+            master.post { initWebtoonPageMode() }
+            return
+        }
+
+        // 좌측: 1페이지(맨 위)
+        master.scrollTo(0, 0)
+        // 우측: 2페이지(패널 높이만큼 아래)
+        slave.post { slave.scrollTo(0, panelH) }
+    }
+
+    /**
+     * 특정 패널을 pageStep 만큼 이동 (pageStep = 패널 높이 배수).
+     * direction > 0 이면 다음, < 0 이면 이전.
+     */
+    fun panelPageStep(panelIndex: Int, direction: Int) {
+        val wv = webViews.getOrNull(panelIndex) ?: return
+        val panelH = wv.height.takeIf { it > 0 } ?: return
+        val currentY = wv.scrollY
+        val newY = (currentY + direction * panelH).coerceAtLeast(0)
+        wv.scrollTo(0, newY)
+    }
+
+    /** 좌측 패널 다음 페이지 */
+    fun leftPageNext()  = panelPageStep(0, +1)
+    /** 좌측 패널 이전 페이지 */
+    fun leftPagePrev()  = panelPageStep(0, -1)
+    /** 우측 패널 다음 페이지 */
+    fun rightPageNext() = panelPageStep(1, +1)
+    /** 우측 패널 이전 페이지 */
+    fun rightPagePrev() = panelPageStep(1, -1)
+
+    // ──────────────────────────────────────────────────────────────
+    // 웹툰 자동 연동 (레거시 - 연동 ON/OFF 방식)
     // ──────────────────────────────────────────────────────────────
 
     /**
