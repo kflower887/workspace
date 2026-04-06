@@ -244,6 +244,7 @@ class FoldableBrowserController(private val context: Context) {
                     if (panelIndex == 0) {
                         this@FoldableBrowserController.onPageFinished?.invoke(url)
                         syncAllWebViewUrls(url)
+                        // 웹툰 배치 재적용은 MainActivity의 onPageFinished 콜백에서 처리
                     } else {
                         // 슬레이브 로드 완료 → 연동 상태면 오프셋 재적용
                         if (isSyncActive) {
@@ -264,7 +265,22 @@ class FoldableBrowserController(private val context: Context) {
 
                 override fun shouldOverrideUrlLoading(
                     view: WebView, request: WebResourceRequest
-                ): Boolean = panelIndex != 0
+                ): Boolean {
+                    if (panelIndex == 0) return false  // 마스터: 그냥 로드 허용
+                    // ─────────────────────────────────────────────────────
+                    // 슬레이브(우측 등)에서 링크 클릭
+                    //  → 마스터(좌측)에 해당 URL 로드
+                    //  → 마스터 onPageFinished 에서 syncAllWebViewUrls() 호출
+                    //     → 슬레이브도 자동으로 같은 URL 로드됨
+                    //  → 웹툰 모드면 로드 완료 후 initWebtoonPageMode() 재적용
+                    // ─────────────────────────────────────────────────────
+                    val url = request.url.toString()
+                    val master = webViews.firstOrNull() ?: return true
+                    // 웹툰 연동 해제 후 마스터 로드 (onPageFinished가 슬레이브 동기화 처리)
+                    unlockSync()
+                    master.loadUrl(url)
+                    return true  // 슬레이브 자체 로드는 차단
+                }
             }
 
             webChromeClient = object : WebChromeClient() {
