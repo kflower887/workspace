@@ -11,7 +11,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 
 /**
- * 폴더블 분할 브라우저 컨트롤러 v3
+ * 폴더블 분할 브라우저 컨트롤러 v4
  *
  * ── 연동 OFF (기본) ─────────────────────────────────────────────────
  *   - 모든 패널 독립 스크롤. 사용자가 각 패널을 원하는 위치에 직접 놓는다.
@@ -88,8 +88,8 @@ class FoldableBrowserController(private val context: Context) {
                 domStorageEnabled = true
                 loadWithOverviewMode = true
                 useWideViewPort = true
-                setSupportZoom(false)
-                builtInZoomControls = false
+                setSupportZoom(true)
+                builtInZoomControls = true
                 displayZoomControls = false
                 mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
                 cacheMode = WebSettings.LOAD_DEFAULT
@@ -105,7 +105,10 @@ class FoldableBrowserController(private val context: Context) {
                 onScrollChangedListener = { masterScrollY ->
                     // 연동 중이면 슬레이브들을 갱신
                     if (isSyncActive) {
-                        webViews.drop(1).forEach { it.applyMasterScroll(masterScrollY) }
+                        val masterMax = this.maxScrollY()
+                        webViews.drop(1).forEach { slave ->
+                            slave.applyMasterScrollClamped(masterScrollY, masterMax)
+                        }
                     }
                 }
             }
@@ -125,8 +128,12 @@ class FoldableBrowserController(private val context: Context) {
                     } else {
                         // 슬레이브 로딩 완료: 연동 중이면 현재 마스터 위치에 맞춰 재갱신
                         if (isSyncActive) {
-                            val masterY = webViews.firstOrNull()?.scrollY ?: 0
-                            view.postDelayed({ applyMasterScroll(masterY) }, 200)
+                            val masterWv = webViews.firstOrNull()
+                            val masterY = masterWv?.scrollY ?: 0
+                            val masterMax = masterWv?.maxScrollY() ?: 0
+                            view.postDelayed({
+                                applyMasterScrollClamped(masterY, masterMax)
+                            }, 300)
                         }
                     }
                 }
@@ -224,4 +231,5 @@ class FoldableBrowserController(private val context: Context) {
     private fun syncAllWebViewUrls(url: String) {
         webViews.drop(1).forEach { if (it.url != url) it.loadUrl(url) }
     }
+
 }

@@ -21,4 +21,20 @@
     <string name="mode_dual_desc">2단 폴더블 - 좌우 2분할 연속 스크롤</string>
     <string name="mode_triple_desc">3단 폴더블 - 3분할 연속 스크롤</string>
     <string name="default_url">https://www.google.com</string>
+
+    <!-- 웹툰 모드 관련 -->
+    <string name="webtoon_mode">웹툰 모드</string>
+    <string name="webtoon_mode_on">🖼 웹툰 ON</string>
+    <string name="webtoon_mode_off">🖼 웹툰</string>
+    <string name="webtoon_mode_enable">웹툰 2열 최적화 모드 활성화\n컷 비율 자동 감지 후 좌우 2열로 배치합니다\n세로컷은 2열, 와이드컷은 전체 너비로 표시됩니다</string>
+    <string name="webtoon_mode_disable">웹툰 모드 OFF — 일반 분할 모드 복귀</string>
+    <string name="webtoon_platform_select">웹툰 플랫폼 선택</string>
+    <string name="webtoon_applying">규칙 적용 중...</string>
+
+    <!-- 연동 관련 -->
+    <string name="sync_guide_title">📌 스크롤 연동 사용법</string>
+    <string name="sync_guide_body">1. 연동 OFF 상태에서 두 화면을 원하는 위치로 스크롤\n2. 좌측을 1화면, 우측을 2화면 시작점에 맞추세요\n3. [연동 ON] 버튼을 누르면 오프셋이 고정됩니다\n4. 이후 좌측 스크롤 시 우측이 자동으로 따라옵니다\n\n(새 페이지 로드 시 연동은 자동 해제됩니다)</string>
+    <string name="sync_lock_title">🔗 연동 잠금 완료</string>
+    <string name="sync_unlock">연동 해제 — 각 화면을 자유롭게 스크롤하세요</string>
+    <string name="sync_single_mode_warn">분할 모드에서만 사용 가능합니다</string>
 </resources>

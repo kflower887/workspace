@@ -66,6 +66,29 @@ class SyncScrollWebView @JvmOverloads constructor(
         isSyncScrolling = false
     }
 
+    /**
+     * 마스터가 스크롤 끝에 도달하면 슬레이브 패널의 최대 범위까지 스크롤
+     * (웹툰처럼 연속 읽기에 유용)
+     */
+    fun applyMasterScrollClamped(masterScrollY: Int, masterMaxScroll: Int) {
+        val offset = lockedOffsetFromMaster ?: return
+        val contentH = computeVerticalScrollRange()
+        val viewH = height
+        val maxScroll = (contentH - viewH).coerceAtLeast(0)
+
+        // 마스터 진행률(0.0~1.0)에 기반한 슬레이브 위치 계산
+        val progress = if (masterMaxScroll > 0) masterScrollY.toFloat() / masterMaxScroll else 0f
+        val targetByProgress = (progress * maxScroll).toInt()
+        // 오프셋 기반 계산
+        val targetByOffset = masterScrollY + offset
+
+        // 두 계산 중 더 정확한 것 선택 (오프셋이 범위 내면 오프셋 우선)
+        val target = if (targetByOffset in 0..maxScroll) targetByOffset else targetByProgress
+        isSyncScrolling = true
+        scrollTo(0, target.coerceIn(0, maxScroll))
+        isSyncScrolling = false
+    }
+
     /** 현재 스크롤 가능한 최대 Y 값 */
     fun maxScrollY(): Int =
         (computeVerticalScrollRange() - height).coerceAtLeast(0)

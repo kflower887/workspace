@@ -2,6 +2,7 @@ package com.foldablebrowser.app.browser
 
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import com.foldablebrowser.app.webtoon.WebtoonPlatform
 
 /** 히스토리 항목 */
 data class HistoryItem(
@@ -50,6 +51,15 @@ class BrowserViewModel : ViewModel() {
 
     /** 화면 강제 가로 모드 */
     val forceLandscape = MutableLiveData(false)
+
+    /** 웹툰 최적화 모드 활성 여부 */
+    val webtoonModeEnabled = MutableLiveData(false)
+
+    /** 현재 감지/선택된 웹툰 플랫폼 */
+    val webtoonPlatform = MutableLiveData(WebtoonPlatform.GENERIC)
+
+    /** 웹툰 모드 적용 결과 (wide컷수, narrow컷수) */
+    val webtoonStats = MutableLiveData<Pair<Int, Int>>(0 to 0)
 
     /** 히스토리 (최대 200개, 최신순) */
     val historyList = MutableLiveData<MutableList<HistoryItem>>(mutableListOf())

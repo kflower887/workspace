@@ -21,7 +21,6 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <!-- 뒤로 -->
         <ImageButton
             android:id="@+id/btnBack"
             android:layout_width="40dp"
@@ -31,7 +30,6 @@
             android:src="@drawable/ic_arrow_back"
             android:alpha="0.4" />
 
-        <!-- 앞으로 -->
         <ImageButton
             android:id="@+id/btnForward"
             android:layout_width="40dp"
@@ -41,7 +39,6 @@
             android:src="@drawable/ic_arrow_forward"
             android:alpha="0.4" />
 
-        <!-- 주소창 -->
         <LinearLayout
             android:id="@+id/addressBarContainer"
             android:layout_width="0dp"
@@ -88,7 +85,6 @@
 
         </LinearLayout>
 
-        <!-- 탭 카운터 -->
         <FrameLayout
             android:id="@+id/btnTabCounter"
             android:layout_width="40dp"
@@ -112,7 +108,6 @@
                 android:textStyle="bold" />
         </FrameLayout>
 
-        <!-- 메뉴 -->
         <ImageButton
             android:id="@+id/btnMenu"
             android:layout_width="40dp"
@@ -123,44 +118,90 @@
 
     </LinearLayout>
 
-    <!-- ── 동시스크롤/회전 컨트롤 바 ── -->
+    <!-- ── 컨트롤바 (연동·회전·웹툰모드) ── -->
     <LinearLayout
         android:id="@+id/controlBar"
         android:layout_width="0dp"
-        android:layout_height="36dp"
+        android:layout_height="40dp"
         android:background="@color/control_bar_bg"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topToolbar">
 
-        <!-- 동시 스크롤 토글 -->
+        <!-- 스크롤 연동 토글 (길게 누르면 도움말) -->
         <TextView
             android:id="@+id/btnSyncScroll"
             android:layout_width="wrap_content"
-            android:layout_height="28dp"
+            android:layout_height="30dp"
             android:background="@drawable/btn_control_bg"
             android:gravity="center"
             android:paddingStart="10dp"
             android:paddingEnd="10dp"
-            android:text="연동 ON"
-            android:textColor="@color/accent_color"
+            android:text="연동 OFF"
+            android:textColor="@color/sync_off_color"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:longClickable="true" />
+
+        <View android:layout_width="6dp" android:layout_height="1dp" />
+
+        <!-- 웹툰 모드 토글 (핵심!) -->
+        <TextView
+            android:id="@+id/btnWebtoonMode"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:background="@drawable/btn_webtoon_bg"
+            android:gravity="center"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="🖼 웹툰"
+            android:textColor="@color/webtoon_off_color"
             android:textSize="11sp"
             android:textStyle="bold" />
+
+        <!-- 웹툰 통계 표시 -->
+        <TextView
+            android:id="@+id/tvWebtoonStats"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:text=""
+            android:textColor="@color/hint_color"
+            android:textSize="10sp"
+            android:visibility="gone" />
 
         <View
             android:layout_width="0dp"
             android:layout_height="1dp"
             android:layout_weight="1" />
 
-        <!-- 화면 회전 토글 -->
+        <!-- 플랫폼 선택 -->
+        <TextView
+            android:id="@+id/btnPlatform"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:background="@drawable/btn_control_bg"
+            android:gravity="center"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="자동"
+            android:textColor="@color/hint_color"
+            android:textSize="10sp"
+            android:visibility="gone" />
+
+        <View android:layout_width="6dp" android:layout_height="1dp" />
+
+        <!-- 화면 회전 -->
         <ImageButton
             android:id="@+id/btnRotate"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
             android:background="@drawable/btn_control_bg"
             android:contentDescription="화면 회전"
             android:src="@drawable/ic_rotate"
@@ -168,7 +209,7 @@
 
     </LinearLayout>
 
-    <!-- ── 로딩 프로그레스 바 ── -->
+    <!-- ── 로딩 프로그레스 ── -->
     <ProgressBar
         android:id="@+id/progressBar"
         style="?android:attr/progressBarStyleHorizontal"
@@ -182,16 +223,67 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/controlBar" />
 
-    <!-- ── 웹뷰 패널 컨테이너 (항상 horizontal) ── -->
+    <!-- ══════════════════════════════════════════════════════════
+         일반 모드: 분할 WebView 컨테이너
+    ══════════════════════════════════════════════════════════════ -->
     <LinearLayout
         android:id="@+id/webViewContainer"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:orientation="horizontal"
+        android:visibility="visible"
         app:layout_constraintBottom_toTopOf="@id/bottomNavBar"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/progressBar" />
+
+    <!-- ══════════════════════════════════════════════════════════
+         웹툰 모드: 단일 풀스크린 WebView + 정보 오버레이
+    ══════════════════════════════════════════════════════════════ -->
+    <FrameLayout
+        android:id="@+id/webtoonContainer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavBar"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/progressBar">
+
+        <!-- 웹툰 전용 WebView (코드에서 추가) -->
+        <com.foldablebrowser.app.webtoon.WebtoonWebView
+            android:id="@+id/webtoonWebView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- 상태 배지 (우하단) -->
+        <LinearLayout
+            android:id="@+id/webtoonBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="12dp"
+            android:background="@drawable/btn_webtoon_badge_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvWebtoonBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🖼 웹툰 최적화 적용"
+                android:textColor="@color/white"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+    </FrameLayout>
 
     <!-- ── 하단 네비게이션 바 ── -->
     <LinearLayout
@@ -206,7 +298,6 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <!-- 홈 -->
         <ImageButton
             android:id="@+id/btnHome"
             android:layout_width="0dp"
@@ -216,7 +307,6 @@
             android:contentDescription="홈"
             android:src="@drawable/ic_home" />
 
-        <!-- 북마크 -->
         <ImageButton
             android:id="@+id/btnBookmark"
             android:layout_width="0dp"
@@ -226,7 +316,6 @@
             android:contentDescription="북마크"
             android:src="@drawable/ic_bookmark" />
 
-        <!-- 폴더블 모드 -->
         <FrameLayout
             android:id="@+id/btnFoldableMode"
             android:layout_width="0dp"
@@ -241,7 +330,7 @@
                 android:layout_height="26dp"
                 android:layout_gravity="center"
                 android:src="@drawable/ic_foldable_dual"
-                android:contentDescription="폴더블 모드 전환" />
+                android:contentDescription="분할 모드 전환" />
 
             <TextView
                 android:id="@+id/tvFoldableMode"
@@ -254,7 +343,6 @@
                 android:textStyle="bold" />
         </FrameLayout>
 
-        <!-- 히스토리 -->
         <ImageButton
             android:id="@+id/btnHistory"
             android:layout_width="0dp"
@@ -264,7 +352,6 @@
             android:contentDescription="히스토리"
             android:src="@drawable/ic_history" />
 
-        <!-- 설정 -->
         <ImageButton
             android:id="@+id/btnSettings"
             android:layout_width="0dp"

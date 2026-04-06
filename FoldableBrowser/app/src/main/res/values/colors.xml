@@ -27,9 +27,12 @@
     <color name="panel_divider">#007AFF</color>
 
     <!-- 컨트롤 바 (동시스크롤/회전 버튼 영역) -->
-    <color name="control_bar_bg">#F0F2F5</color>
-    <color name="sync_on_color">#0066CC</color>
-    <color name="sync_off_color">#888888</color>
+    <color name="control_bar_bg">#EAECF0</color>
+    <color name="sync_on_color">#0055AA</color>
+    <color name="sync_off_color">#666666</color>
+    <color name="webtoon_on_color">#C84800</color>
+    <color name="webtoon_off_color">#996600</color>
+    <color name="webtoon_badge_bg">#CC1A1A1A</color>
 
     <!-- 아이콘 -->
     <color name="icon_default">#666666</color>
