@@ -24,7 +24,10 @@ data class BrowserSettings(
     val homePage: String = "https://www.google.com",
     val textSize: Int = 100,        // WebView textZoom (%)
     val jsEnabled: Boolean = true,
-    val desktopMode: Boolean = false
+    val desktopMode: Boolean = false,
+    // 웹툰 네비 버튼 수직 위치 (1=최하단 ~ 100=최상단, 기본 하단=10, 상단=90, 중단=50)
+    val navLeftPos: Int  = 10,
+    val navRightPos: Int = 10
 )
 
 /**

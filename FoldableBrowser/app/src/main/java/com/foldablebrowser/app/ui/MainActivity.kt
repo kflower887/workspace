@@ -8,7 +8,6 @@ import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.KeyEvent
-import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsetsController
 import android.view.inputmethod.EditorInfo
@@ -52,13 +51,6 @@ class MainActivity : AppCompatActivity() {
 
     private var isWebtoonMode = false
     private var isFullscreen  = false
-
-    // 드래그 이동용 터치 추적 변수
-    private var dragStartRawX = 0f
-    private var dragStartRawY = 0f
-    private var dragStartTransX = 0f
-    private var dragStartTransY = 0f
-    private var isDragging = false
 
     // 전체화면 시 UI 자동 복귀 Runnable
     private val fullscreenHintHideRunnable = Runnable {
@@ -172,9 +164,12 @@ class MainActivity : AppCompatActivity() {
             browserController.initWebtoonPageMode()
         }
 
-        // 좌/우 네비게이션 오버레이 버튼 표시
+        // 좌/우 네비게이션 오버레이 버튼 표시 + 저장된 위치 적용
         binding.webtoonNavLeft.visibility  = View.VISIBLE
         binding.webtoonNavRight.visibility = View.VISIBLE
+        val settings = viewModel.settings.value ?: BrowserSettings()
+        applyNavPosition(isLeft = true,  pos = settings.navLeftPos)
+        applyNavPosition(isLeft = false, pos = settings.navRightPos)
 
         updateWebtoonButton(true)
         Toast.makeText(
@@ -346,9 +341,9 @@ class MainActivity : AppCompatActivity() {
         binding.btnRightPrev.setOnClickListener { browserController.webtoonPagePrev() }
         binding.btnRightNext.setOnClickListener { browserController.webtoonPageNext() }
 
-        // ── 드래그로 버튼 그룹 자유 이동 ──
-        setupNavDrag(binding.webtoonNavLeft,  isLeft = true)
-        setupNavDrag(binding.webtoonNavRight, isLeft = false)
+        // ── 설정에 저장된 위치로 버튼 그룹 초기 배치 ──
+        applyNavPosition(isLeft = true,  pos = (viewModel.settings.value ?: BrowserSettings()).navLeftPos)
+        applyNavPosition(isLeft = false, pos = (viewModel.settings.value ?: BrowserSettings()).navRightPos)
 
         // ── 플랫폼 버튼 숨김 (웹툰 모드 재설계로 불필요) ──
         binding.btnPlatform.visibility = View.GONE
@@ -643,7 +638,9 @@ class MainActivity : AppCompatActivity() {
             "텍스트 크기: ${cur.textSize}%",
             "자바스크립트: ${if (cur.jsEnabled) "허용" else "차단"}",
             "데스크톱 모드: ${if (cur.desktopMode) "켜짐" else "꺼짐"}",
-            "⌨️ 한/영 키보드 전환"
+            "⌨️ 한/영 키보드 전환",
+            "📖 좌버튼 위치: ${navPosLabel(cur.navLeftPos)}",
+            "📖 우버튼 위치: ${navPosLabel(cur.navRightPos)}"
         )
         AlertDialog.Builder(this).setTitle("설정")
             .setItems(items) { _, which ->
@@ -661,9 +658,71 @@ class MainActivity : AppCompatActivity() {
                     2 -> { viewModel.updateSettings(cur.copy(jsEnabled = !cur.jsEnabled)); showSettingsDialog() }
                     3 -> { viewModel.updateSettings(cur.copy(desktopMode = !cur.desktopMode)); showSettingsDialog() }
                     4 -> switchInputLanguage()
+                    5 -> showNavPosDialog(isLeft = true,  cur = cur)
+                    6 -> showNavPosDialog(isLeft = false, cur = cur)
                 }
             }
             .setNegativeButton("닫기", null).show()
+    }
+
+    /** pos 값(1~100)을 사람이 읽기 좋은 라벨로 변환 */
+    private fun navPosLabel(pos: Int): String = when (pos) {
+        10  -> "하단"
+        50  -> "중단"
+        90  -> "상단"
+        else -> "$pos (직접입력)"
+    }
+
+    /**
+     * 좌/우 버튼 수직 위치 선택 다이얼로그.
+     * 상(90) / 중(50) / 하(10) / 직접입력(1~100) 네 가지 선택 가능.
+     */
+    private fun showNavPosDialog(isLeft: Boolean, cur: BrowserSettings) {
+        val label   = if (isLeft) "좌버튼" else "우버튼"
+        val curPos  = if (isLeft) cur.navLeftPos else cur.navRightPos
+        val presets = listOf("상단 (90)" to 90, "중단 (50)" to 50, "하단 (10)" to 10, "직접 입력 (1~100)" to -1)
+        val labels  = presets.map { it.first }.toTypedArray()
+        // 현재 값에 해당하는 preset 선택
+        val checkedIdx = presets.indexOfFirst { it.second == curPos }.takeIf { it >= 0 } ?: (presets.size - 1)
+
+        AlertDialog.Builder(this)
+            .setTitle("$label 위치")
+            .setSingleChoiceItems(labels, checkedIdx) { dialog, which ->
+                val chosen = presets[which].second
+                if (chosen >= 0) {
+                    // 상/중/하 즉시 적용
+                    applyAndSaveNavPos(isLeft, chosen, cur)
+                    dialog.dismiss()
+                } else {
+                    // 직접 입력: EditText 다이얼로그
+                    dialog.dismiss()
+                    val et = android.widget.EditText(this).apply {
+                        inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                        setText(curPos.toString())
+                        hint = "1 (최하단) ~ 100 (최상단)"
+                    }
+                    AlertDialog.Builder(this)
+                        .setTitle("$label 위치 직접 입력")
+                        .setMessage("1(최하단) ~ 100(최상단) 사이 숫자를 입력하세요")
+                        .setView(et)
+                        .setPositiveButton("적용") { _, _ ->
+                            val v = et.text.toString().toIntOrNull()?.coerceIn(1, 100) ?: curPos
+                            applyAndSaveNavPos(isLeft, v, cur)
+                        }
+                        .setNegativeButton("취소", null)
+                        .show()
+                }
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
+    /** 설정 저장 + 버튼 위치 즉시 반영 */
+    private fun applyAndSaveNavPos(isLeft: Boolean, pos: Int, cur: BrowserSettings) {
+        val newSettings = if (isLeft) cur.copy(navLeftPos  = pos)
+                          else        cur.copy(navRightPos = pos)
+        viewModel.updateSettings(newSettings)
+        applyNavPosition(isLeft = isLeft, pos = pos)
     }
 
     /**
@@ -694,84 +753,32 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 웹툰 네비 버튼 드래그 이동
+    // 웹툰 네비 버튼 수직 위치 반영
     // ─────────────────────────────────────────────────────────────
 
     /**
-     * navGroup(webtoonNavLeft / webtoonNavRight)에 드래그 터치 리스너를 설정.
-     * - 손가락을 올리고 드래그 → translationX/Y로 자유 이동
-     * - 손을 떼면 → 화면 밖으로 나가지 않도록 clamp
-     * - 짧은 탭(이동 거리 < 8dp) → 드래그가 아닌 클릭으로 처리 (이전/다음 버튼 동작)
+     * pos (1~100) 값을 버튼 그룹의 수직 위치로 변환하여 적용.
+     *   1  = 패널 최하단
+     *   50 = 패널 중단
+     *   100= 패널 최상단
+     *
+     * 버튼 그룹은 layout_gravity=bottom 고정이고,
+     * translationY 를 음수 방향으로 올려서 위치를 조정한다.
+     * 실제 이동량 = (pos-1)/(100-1) * (패널높이 - 버튼그룹높이)
      */
-    @Suppress("ClickableViewAccessibility")
-    private fun setupNavDrag(navGroup: android.view.View, @Suppress("UNUSED_PARAMETER") isLeft: Boolean) {
-        val tapSlop = (8 * resources.displayMetrics.density)  // 8dp → 드래그 판정 임계값
-
-        navGroup.setOnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    dragStartRawX  = event.rawX
-                    dragStartRawY  = event.rawY
-                    dragStartTransX = v.translationX
-                    dragStartTransY = v.translationY
-                    isDragging = false
-                    // 드래그 시작 시 살짝 불투명하게 피드백
-                    v.animate().alpha(1f).setDuration(100).start()
-                    false  // 자식 뷰(버튼) 클릭 이벤트도 전달
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    val dx = event.rawX - dragStartRawX
-                    val dy = event.rawY - dragStartRawY
-                    if (!isDragging && (Math.abs(dx) > tapSlop || Math.abs(dy) > tapSlop)) {
-                        isDragging = true
-                    }
-                    if (isDragging) {
-                        v.translationX = dragStartTransX + dx
-                        v.translationY = dragStartTransY + dy
-                        true
-                    } else false
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    v.animate().alpha(0.85f).setDuration(100).start()
-                    if (isDragging) {
-                        // 화면 경계 밖으로 나가지 않도록 clamp
-                        clampNavView(v)
-                        isDragging = false
-                        true  // 이동 후엔 클릭 이벤트 소비
-                    } else {
-                        false  // 탭이면 자식 버튼에게 클릭 전달
-                    }
-                }
-                else -> false
-            }
+    private fun applyNavPosition(isLeft: Boolean, pos: Int) {
+        val navView = if (isLeft) binding.webtoonNavLeft else binding.webtoonNavRight
+        val clamped = pos.coerceIn(1, 100)
+        // 레이아웃이 완료된 후에 계산해야 height를 알 수 있음
+        navView.post {
+            val parentH = binding.contentFrame.height.toFloat()
+            val viewH   = navView.height.toFloat()
+            if (parentH <= 0f || viewH <= 0f) return@post
+            // pos=1(하단)→ translationY=0, pos=100(상단)→ translationY=-(parentH-viewH)
+            val maxUp = (parentH - viewH).coerceAtLeast(0f)
+            val ratio = (clamped - 1) / 99f          // 0.0(하단) ~ 1.0(상단)
+            navView.translationY = -(maxUp * ratio)
         }
-    }
-
-    /**
-     * 버튼 그룹이 contentFrame 영역 밖으로 벗어나지 않도록 translationX/Y를 보정.
-     */
-    private fun clampNavView(v: android.view.View) {
-        val parent = binding.contentFrame
-        val parentW = parent.width.toFloat()
-        val parentH = parent.height.toFloat()
-
-        // v의 기본 위치(layout으로 정해진 left/top) + translation
-        val vW = v.width.toFloat()
-        val vH = v.height.toFloat()
-
-        // 현재 화면상 위치
-        val curLeft = v.left + v.translationX
-        val curTop  = v.top  + v.translationY
-
-        // clamp: 0 ~ parentSize - viewSize
-        val clampedLeft = curLeft.coerceIn(0f, (parentW - vW).coerceAtLeast(0f))
-        val clampedTop  = curTop.coerceIn(0f, (parentH - vH).coerceAtLeast(0f))
-
-        v.animate()
-            .translationX(clampedLeft - v.left)
-            .translationY(clampedTop  - v.top)
-            .setDuration(120)
-            .start()
     }
 
     // ─────────────────────────────────────────────────────────────
