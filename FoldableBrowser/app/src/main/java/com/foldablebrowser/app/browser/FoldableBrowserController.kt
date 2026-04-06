@@ -103,36 +103,61 @@ class FoldableBrowserController(private val context: Context) {
     /**
      * 다음 페이지 쌍으로 이동 (좌/우 동시).
      *
-     * 연동 OFF: 현재 좌측 scrollY + panelH → 좌 이동, 우=좌+panelH
-     * 연동 ON : 좌측만 +panelH 이동, 우측은 연동 콜백이 자동 처리
+     * ─ 동작 원리 ─────────────────────────────────────────────────
+     * pageIndex 로 현재 페이지 쌍을 추적:
+     *   index=0 → 좌=0*panelH(A),  우=1*panelH(B)
+     *   index=1 → 좌=2*panelH(C),  우=3*panelH(D)
+     *   index=2 → 좌=4*panelH(E),  우=5*panelH(F)
+     *
+     * 스크롤로 중간에 있어도 버튼을 누르면
+     * 현재 좌측 scrollY를 panelH 단위로 snap→ 다음 짝수 index로 이동.
+     * ─────────────────────────────────────────────────────────────
      */
     fun webtoonPageNext() {
-        val left  = webViews.getOrNull(0) ?: return
-        val right = webViews.getOrNull(1) ?: return
+        val left   = webViews.getOrNull(0) ?: return
+        val right  = webViews.getOrNull(1) ?: return
         val panelH = left.height.takeIf { it > 0 } ?: return
-        val newLeftY = left.scrollY + panelH
-        left.scrollTo(0, newLeftY)
-        if (!isSyncActive) {
-            // 연동 OFF: 우측도 직접 이동
-            right.scrollTo(0, newLeftY + panelH)
-        }
-        // 연동 ON: SyncScrollWebView 콜백이 우측을 자동으로 newLeftY+panelH 로 이동
+
+        // 현재 좌측 위치를 panelH 단위로 snap한 뒤 +1 페이지쌍 (짝수 단위)
+        val curIndex  = left.scrollY / panelH          // 현재 몇 번째 panelH 단위인지
+        val nextIndex = (curIndex / 2 + 1) * 2         // 다음 짝수 index (2, 4, 6…)
+        val newLeftY  = nextIndex * panelH
+
+        applyBothPanels(left, right, newLeftY, panelH)
     }
 
     /**
      * 이전 페이지 쌍으로 이동 (좌/우 동시).
      */
     fun webtoonPagePrev() {
-        val left  = webViews.getOrNull(0) ?: return
-        val right = webViews.getOrNull(1) ?: return
+        val left   = webViews.getOrNull(0) ?: return
+        val right  = webViews.getOrNull(1) ?: return
         val panelH = left.height.takeIf { it > 0 } ?: return
-        val newLeftY = (left.scrollY - panelH).coerceAtLeast(0)
+
+        // 현재 좌측 위치를 panelH 단위로 snap한 뒤 -1 페이지쌍 (짝수 단위)
+        val curIndex  = left.scrollY / panelH
+        // 현재 짝수 기준 index — 정확히 경계에 있으면 한 단계 더 내림
+        val baseIndex = if (left.scrollY % panelH == 0 && curIndex % 2 == 0) curIndex
+                        else (curIndex / 2) * 2
+        val prevIndex = (baseIndex - 2).coerceAtLeast(0)
+        val newLeftY  = prevIndex * panelH
+
+        applyBothPanels(left, right, newLeftY, panelH)
+    }
+
+    /** 좌/우 패널을 newLeftY / newLeftY+panelH 로 이동 (연동 상태 반영) */
+    private fun applyBothPanels(
+        left: SyncScrollWebView, right: SyncScrollWebView,
+        newLeftY: Int, panelH: Int
+    ) {
         left.scrollTo(0, newLeftY)
-        if (!isSyncActive) {
-            // 연동 OFF: 우측도 직접 이동
-            right.scrollTo(0, (newLeftY + panelH).coerceAtLeast(0))
+        if (isSyncActive) {
+            // 연동 ON: onScrollChanged 콜백이 우측 자동 이동
+            // scrollTo 는 동기이므로 콜백이 즉시 호출됨 — 추가 처리 불필요
+        } else {
+            // 연동 OFF: 우측 직접 이동
+            right.scrollTo(0, newLeftY + panelH)
         }
-        // 연동 ON: SyncScrollWebView 콜백이 우측을 자동으로 이동
     }
 
     // ──────────────────────────────────────────────────────────────
