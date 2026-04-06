@@ -11,21 +11,19 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 
 /**
- * 폴더블 분할 브라우저 컨트롤러 v4
+ * 폴더블 분할 브라우저 컨트롤러 v5
  *
- * ── 연동 OFF (기본) ─────────────────────────────────────────────────
- *   - 모든 패널 독립 스크롤. 사용자가 각 패널을 원하는 위치에 직접 놓는다.
- *   - 새 URL 로드 시 모든 패널이 맨 위(scrollY=0)에서 시작.
+ * ── 일반 모드 ────────────────────────────────────────────────────────
+ *   SINGLE / DUAL / TRIPLE 분할. 연동 OFF면 각 패널 독립 스크롤.
+ *   연동 ON(lockSyncFromCurrentPositions) → 오프셋 고정 후 마스터 추종.
  *
- * ── 연동 ON ─────────────────────────────────────────────────────────
- *   - lockSyncFromCurrentPositions() 호출 시점의 각 슬레이브 scrollY 와
- *     마스터 scrollY 의 차이(offset)를 확정(lock).
- *   - 이후 마스터 스크롤 이벤트마다
- *       slaveScrollY = masterScrollY + lockedOffset
- *     로 슬레이브를 이동. 범위 클램핑 포함.
+ * ── 웹툰 모드 ────────────────────────────────────────────────────────
+ *   DUAL 분할 + 페이지 로드 완료 시 우측을 "좌측 패널 높이(px)"만큼
+ *   자동으로 오프셋 고정 → 좌측 = 1페이지, 우측 = 2페이지가 바로 연결.
+ *   이후 좌측 스크롤 → 우측 자동 추종 (offset = panelHeight 고정).
  *
- * ── 항상 좌/우 배치 ─────────────────────────────────────────────────
- *   패널은 항상 LinearLayout.HORIZONTAL 로 배치 (호출 측 MainActivity 에서 처리).
+ *   핵심: panelHeight 는 WebView.height (실제 뷰 높이, px) 를 사용.
+ *   contentHeight가 아닌 뷰 높이를 쓰므로 페이지 로드 전에도 정확.
  */
 class FoldableBrowserController(private val context: Context) {
 
@@ -36,6 +34,10 @@ class FoldableBrowserController(private val context: Context) {
     var isSyncActive: Boolean = false
         private set
 
+    /** 웹툰 자동 연동 모드 */
+    var isWebtoonSyncMode: Boolean = false
+        private set
+
     var onPageStarted: ((url: String) -> Unit)? = null
     var onPageFinished: ((url: String) -> Unit)? = null
     var onTitleReceived: ((title: String) -> Unit)? = null
@@ -43,14 +45,58 @@ class FoldableBrowserController(private val context: Context) {
     var onReceivedIcon: ((icon: Bitmap?) -> Unit)? = null
 
     // ──────────────────────────────────────────────────────────────
-    // 연동 ON/OFF
+    // 웹툰 자동 연동
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * 연동 ON — 현재 각 패널 위치를 기준으로 오프셋을 확정한다.
-     * @return 확정된 오프셋 리스트 (인덱스 0 = 마스터, 항상 0)
+     * 웹툰 모드 자동 연동 활성화.
+     * 마스터 패널 높이(px) × panelIndex 를 각 슬레이브의 오프셋으로 즉시 고정.
+     * 페이지 로드가 완전히 끝나지 않아도 뷰 높이는 이미 확정되어 있으므로 정확.
      */
+    fun enableWebtoonSync() {
+        isWebtoonSyncMode = true
+        applyWebtoonOffsets()
+    }
+
+    fun disableWebtoonSync() {
+        isWebtoonSyncMode = false
+        unlockSync()
+    }
+
+    /**
+     * 각 슬레이브에 panelHeight × panelIndex 오프셋을 적용하고 isSyncActive = true.
+     * 슬레이브 WebView가 아직 레이아웃되지 않은 경우(height=0) → post로 재시도.
+     */
+    private fun applyWebtoonOffsets() {
+        val master = webViews.firstOrNull() ?: return
+        val panelH = master.height   // 뷰 높이 (px) — 항상 패널 높이와 동일
+
+        if (panelH == 0) {
+            // 레이아웃 전이면 다음 프레임에 재시도
+            master.post { applyWebtoonOffsets() }
+            return
+        }
+
+        webViews.forEach { wv ->
+            if (wv.panelIndex == 0) {
+                wv.lockedOffsetFromMaster = null
+            } else {
+                // 슬레이브 n번: masterScrollY + panelH * n 위치에 표시
+                val offset = panelH * wv.panelIndex
+                wv.lockedOffsetFromMaster = offset
+                // 현재 마스터 위치에 맞게 즉시 이동
+                wv.applyMasterScrollClamped(master.scrollY, master.maxScrollY())
+            }
+        }
+        isSyncActive = true
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // 수동 연동 ON/OFF
+    // ──────────────────────────────────────────────────────────────
+
     fun lockSyncFromCurrentPositions(): List<Int> {
+        isWebtoonSyncMode = false   // 수동 잠금 시 웹툰 자동모드 해제
         val master = webViews.firstOrNull() ?: return emptyList()
         val masterY = master.scrollY
         val offsets = mutableListOf<Int>()
@@ -63,9 +109,6 @@ class FoldableBrowserController(private val context: Context) {
         return offsets
     }
 
-    /**
-     * 연동 OFF — 슬레이브 오프셋 해제, 모든 패널 독립 스크롤로 복귀.
-     */
     fun unlockSync() {
         webViews.forEach { it.lockedOffsetFromMaster = null }
         isSyncActive = false
@@ -93,6 +136,7 @@ class FoldableBrowserController(private val context: Context) {
                 displayZoomControls = false
                 mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
                 cacheMode = WebSettings.LOAD_DEFAULT
+                @Suppress("DEPRECATION")
                 databaseEnabled = true
                 allowFileAccess = true
                 mediaPlaybackRequiresUserGesture = false
@@ -100,10 +144,8 @@ class FoldableBrowserController(private val context: Context) {
             scrollBarStyle = WebView.SCROLLBARS_OUTSIDE_OVERLAY
             isScrollbarFadingEnabled = true
 
-            // 마스터(패널0)만 스크롤 콜백 설치
             if (panelIndex == 0) {
                 onScrollChangedListener = { masterScrollY ->
-                    // 연동 중이면 슬레이브들을 갱신
                     if (isSyncActive) {
                         val masterMax = this.maxScrollY()
                         webViews.drop(1).forEach { slave ->
@@ -123,24 +165,24 @@ class FoldableBrowserController(private val context: Context) {
                 override fun onPageFinished(view: WebView, url: String) {
                     if (panelIndex == 0) {
                         this@FoldableBrowserController.onPageFinished?.invoke(url)
-                        // 슬레이브에 같은 URL 로드
                         syncAllWebViewUrls(url)
                     } else {
-                        // 슬레이브 로딩 완료: 연동 중이면 현재 마스터 위치에 맞춰 재갱신
+                        // 슬레이브 로드 완료 → 웹툰 모드면 오프셋 즉시 재적용
                         if (isSyncActive) {
-                            val masterWv = webViews.firstOrNull()
-                            val masterY = masterWv?.scrollY ?: 0
-                            val masterMax = masterWv?.maxScrollY() ?: 0
+                            val master = webViews.firstOrNull()
+                            val masterY   = master?.scrollY ?: 0
+                            val masterMax = master?.maxScrollY() ?: 0
                             view.postDelayed({
-                                applyMasterScrollClamped(masterY, masterMax)
-                            }, 300)
+                                if (isWebtoonSyncMode) applyWebtoonOffsets()
+                                else applyMasterScrollClamped(masterY, masterMax)
+                            }, 200)
                         }
                     }
                 }
 
                 override fun shouldOverrideUrlLoading(
                     view: WebView, request: WebResourceRequest
-                ): Boolean = panelIndex != 0   // 슬레이브는 직접 네비게이션 차단
+                ): Boolean = panelIndex != 0
             }
 
             webChromeClient = object : WebChromeClient() {
@@ -148,12 +190,10 @@ class FoldableBrowserController(private val context: Context) {
                     if (panelIndex == 0)
                         this@FoldableBrowserController.onProgressChanged?.invoke(newProgress)
                 }
-
                 override fun onReceivedTitle(view: WebView, title: String) {
                     if (panelIndex == 0)
                         this@FoldableBrowserController.onTitleReceived?.invoke(title)
                 }
-
                 override fun onReceivedIcon(view: WebView, icon: Bitmap?) {
                     if (panelIndex == 0)
                         this@FoldableBrowserController.onReceivedIcon?.invoke(icon)
@@ -170,30 +210,37 @@ class FoldableBrowserController(private val context: Context) {
         currentMode = mode
         val count = when (mode) {
             FoldableMode.SINGLE -> 1
-            FoldableMode.DUAL -> 2
+            FoldableMode.DUAL   -> 2
             FoldableMode.TRIPLE -> 3
         }
-
         val currentUrl = webViews.firstOrNull()?.url ?: ""
         webViews.forEach { it.destroy() }
         webViews.clear()
-        isSyncActive = false   // 모드 전환 시 연동 해제
-
+        isSyncActive = false
+        isWebtoonSyncMode = false
         repeat(count) { i -> webViews.add(createWebView(i)) }
-
         if (currentUrl.isNotEmpty()) loadUrl(currentUrl)
         return webViews.toList()
     }
 
     fun getPanels(): List<SyncScrollWebView> = webViews.toList()
+    fun getMasterView(): SyncScrollWebView? = webViews.firstOrNull()
 
     // ──────────────────────────────────────────────────────────────
     // 브라우저 조작
     // ──────────────────────────────────────────────────────────────
 
     fun loadUrl(url: String) {
-        // 새 URL 로드 시 연동 해제 → 사용자가 다시 위치를 정하고 잠근다
         unlockSync()
+        isWebtoonSyncMode = false
+        webViews.firstOrNull()?.loadUrl(url)
+    }
+
+    fun loadUrlWebtoon(url: String) {
+        // 웹툰 모드에서 URL 로드: 로드 후 자동 오프셋 재적용 (isWebtoonSyncMode 유지)
+        val wasWebtoon = isWebtoonSyncMode
+        unlockSync()
+        isWebtoonSyncMode = wasWebtoon
         webViews.firstOrNull()?.loadUrl(url)
     }
 
@@ -207,13 +254,15 @@ class FoldableBrowserController(private val context: Context) {
         return if (m.canGoForward()) { m.goForward(); true } else false
     }
 
-    fun canGoBack() = webViews.firstOrNull()?.canGoBack() ?: false
+    fun canGoBack()    = webViews.firstOrNull()?.canGoBack()    ?: false
     fun canGoForward() = webViews.firstOrNull()?.canGoForward() ?: false
     fun getCurrentUrl() = webViews.firstOrNull()?.url ?: ""
-    fun getTitle() = webViews.firstOrNull()?.title ?: ""
+    fun getTitle()      = webViews.firstOrNull()?.title ?: ""
 
     fun reload() {
+        val wasWebtoon = isWebtoonSyncMode
         unlockSync()
+        isWebtoonSyncMode = wasWebtoon
         webViews.firstOrNull()?.reload()
     }
 
@@ -231,5 +280,4 @@ class FoldableBrowserController(private val context: Context) {
     private fun syncAllWebViewUrls(url: String) {
         webViews.drop(1).forEach { if (it.url != url) it.loadUrl(url) }
     }
-
 }
