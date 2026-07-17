@@ -1,0 +1,328 @@
+:root {
+  --cream: #fff8e8;
+  --mango: #ffb703;
+  --mango-dark: #fb8500;
+  --ink: #4a3826;
+  --card: #ffffff;
+  --radius: 20px;
+  --shadow: 0 6px 16px rgba(120, 80, 30, 0.15);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+  background: var(--cream);
+  color: var(--ink);
+  overscroll-behavior: none;
+}
+
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--cream);
+  position: relative;
+}
+
+.hidden { display: none !important; }
+
+/* ---- 상단 바 ---- */
+#topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--mango);
+  color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: var(--shadow);
+}
+#topbar-title {
+  font-weight: 800;
+  font-size: 18px;
+  flex: 1;
+}
+#topbar-avatar {
+  width: 40px; height: 40px;
+  background: #fff;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.icon-btn {
+  border: none;
+  background: rgba(255,255,255,0.25);
+  font-size: 18px;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+#coin-display {
+  background: rgba(255,255,255,0.25);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* ---- 화면 공통 ---- */
+.screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 14px;
+}
+
+/* ---- 마을 지도 ---- */
+.map-intro h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  color: var(--mango-dark);
+}
+.map-intro .sub {
+  display: block;
+  font-size: 13px;
+  color: #a97a3d;
+  font-weight: 500;
+}
+.map-intro .lead {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+#town-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.town-card {
+  border: none;
+  border-radius: var(--radius);
+  padding: 16px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12.5px;
+  transition: transform 0.15s ease;
+}
+.town-card:active { transform: scale(0.94); }
+.town-emoji { font-size: 30px; }
+
+.theme-home { background: linear-gradient(145deg, #ffafcc, #ff8fab); }
+.theme-school { background: linear-gradient(145deg, #8ecae6, #4ea8de); }
+.theme-cafe { background: linear-gradient(145deg, #d9b48f, #b5834a); }
+.theme-taekwondo { background: linear-gradient(145deg, #6fbf73, #3f9142); }
+.theme-playground { background: linear-gradient(145deg, #ffd166, #fb8500); }
+.theme-piano { background: linear-gradient(145deg, #c8b6ff, #9d84e8); }
+.theme-restaurant { background: linear-gradient(145deg, #ff9b85, #ef5b45); }
+.theme-stationery { background: linear-gradient(145deg, #a0e7e5, #45c4c0); }
+.theme-bank { background: linear-gradient(145deg, #b5c99a, #7e9c6f); }
+
+/* ---- 장소 화면 ---- */
+.location-header h2 { margin: 0 0 2px; font-size: 20px; }
+.location-header p { margin: 0; font-size: 13px; color: #7a5c3c; }
+
+.panel { background: var(--card); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); }
+
+.room-wrap { flex: 1; min-height: 180px; }
+#room-canvas {
+  position: relative;
+  width: 100%;
+  height: 240px;
+  border-radius: var(--radius);
+  background: repeating-linear-gradient(45deg, #fff3d6, #fff3d6 20px, #ffe9b8 20px, #ffe9b8 40px);
+  box-shadow: inset 0 0 0 3px #fff, var(--shadow);
+  overflow: hidden;
+}
+.placed-item {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 30px;
+  cursor: pointer;
+  filter: drop-shadow(0 3px 3px rgba(0,0,0,0.2));
+  transition: transform 0.1s;
+}
+.placed-item:active { transform: translate(-50%, -50%) scale(0.85); }
+.room-hint {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11.5px;
+  background: rgba(255,255,255,0.85);
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #9c7a4a;
+  white-space: nowrap;
+}
+.room-hint.active { background: var(--mango); color: #fff; font-weight: 700; }
+
+/* ---- 탭 ---- */
+#room-tabs {
+  display: flex;
+  gap: 8px;
+}
+.tab-btn {
+  flex: 1;
+  border: none;
+  background: #ffe9b8;
+  color: #a97a3d;
+  padding: 10px;
+  border-radius: 14px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.tab-btn.active { background: var(--mango); color: #fff; }
+
+.tab-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 12px;
+}
+
+.item-chip {
+  background: var(--card);
+  border: 2px solid #ffe0a3;
+  border-radius: 14px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.item-chip.selected { border-color: var(--mango-dark); background: #fff3d6; }
+.item-chip.shop { flex-direction: column; align-items: center; gap: 4px; cursor: default; min-width: 84px; }
+.item-chip.owned { opacity: 0.6; }
+.chip-emoji { font-size: 20px; }
+.chip-price { font-size: 11px; color: #a97a3d; }
+.buy-btn {
+  border: none;
+  background: var(--mango-dark);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.empty-hint { font-size: 12.5px; color: #a98a5f; padding: 6px 2px; }
+
+/* ---- 활동 패널들 ---- */
+.activity-box { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.action-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.action-btn {
+  border: none;
+  background: var(--mango-dark);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  cursor: pointer;
+}
+.action-btn.small { padding: 8px 10px; font-size: 12px; }
+.action-btn:active { transform: scale(0.96); }
+
+.avatar-preview { display: flex; justify-content: center; }
+.avatar-preview.mid svg { width: 90px; height: 90px; }
+
+.swatch-group p { margin: 6px 0 4px; font-size: 12.5px; font-weight: 700; color: #7a5c3c; }
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.swatch {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+}
+.swatch.active { border-color: var(--mango-dark); }
+
+.menu-list { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.menu-item {
+  border: none;
+  background: #fff3d6;
+  border-radius: 14px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 78px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.menu-emoji { font-size: 24px; }
+.menu-name { font-size: 12px; }
+.menu-price { font-size: 11px; color: var(--mango-dark); }
+
+.piano-keys { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+.piano-key {
+  width: 32px; height: 60px;
+  border: none;
+  background: #fff;
+  border: 2px solid #e9d6ad;
+  border-radius: 8px;
+  font-weight: 700;
+  color: #a97a3d;
+  cursor: pointer;
+}
+.piano-key:active { background: var(--mango); color: #fff; }
+
+.bank-transfer { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center; }
+.bank-transfer input {
+  width: 90px;
+  padding: 8px;
+  border-radius: 10px;
+  border: 2px solid #ffe0a3;
+  font-size: 13px;
+}
+
+/* ---- 토스트 ---- */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translate(-50%, 20px);
+  background: var(--ink);
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s ease;
+  z-index: 50;
+  max-width: 90%;
+  text-align: center;
+}
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---- 애니메이션 ---- */
+@keyframes bounce-anim {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.15) rotate(-4deg); }
+  60% { transform: scale(0.95) rotate(4deg); }
+  100% { transform: scale(1); }
+}
+.bounce { animation: bounce-anim 0.4s ease; }

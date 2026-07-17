@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>망고월드 - 군포 당정동 이야기</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="app">
+
+  <!-- 상단 바 -->
+  <header id="topbar">
+    <button id="btn-home" class="icon-btn" title="지도로">🗺️</button>
+    <div id="topbar-title">망고월드</div>
+    <div id="topbar-avatar"></div>
+    <div id="coin-display">🥭 <span id="coin-count">0</span></div>
+  </header>
+
+  <!-- 마을 지도 화면 -->
+  <main id="screen-map" class="screen">
+    <div class="map-intro">
+      <h1>망고월드 <span class="sub">군포 당정동 이야기</span></h1>
+      <p class="lead">당정초등학교 2학년, <b>김하린</b>과 함께 군포 곳곳을 자유롭게 탐험해보세요!</p>
+    </div>
+    <div id="town-grid"></div>
+  </main>
+
+  <!-- 장소 화면 (동적으로 채워짐) -->
+  <main id="screen-location" class="screen hidden">
+    <section class="location-header">
+      <h2 id="loc-title"></h2>
+      <p id="loc-desc"></p>
+    </section>
+
+    <section id="loc-activity" class="panel hidden"></section>
+
+    <section class="room-wrap">
+      <div id="room-canvas"></div>
+    </section>
+
+    <nav id="room-tabs">
+      <button class="tab-btn active" data-tab="inventory">🎒 보관함</button>
+      <button class="tab-btn" data-tab="shop">🛍️ 상점</button>
+    </nav>
+
+    <section id="tab-inventory" class="tab-panel"></section>
+    <section id="tab-shop" class="tab-panel hidden"></section>
+  </main>
+
+  <div id="toast"></div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/avatar.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

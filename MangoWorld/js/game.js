@@ -1,0 +1,522 @@
+// 망고월드 - 메인 게임 로직
+
+const SAVE_KEY = "mangoWorldSave_v1";
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function uid() {
+  return "id" + Math.random().toString(36).slice(2, 10);
+}
+
+function defaultState() {
+  const owned = {};
+  ITEMS.forEach((it) => {
+    if (it.starter) owned[it.id] = true;
+  });
+  return {
+    coins: 3000,
+    savings: 0,
+    character: { hair: CHARACTER_OPTIONS.hair[0], outfit: CHARACTER_OPTIONS.outfit[0] },
+    owned,
+    placed: {},
+    taekwondoBeltIndex: 0,
+    daily: { date: todayStr(), taekwondoCount: 0, pianoCount: 0, allowanceClaimed: false },
+  };
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      return Object.assign(defaultState(), saved);
+    }
+  } catch (e) {
+    /* 저장 데이터를 읽지 못하면 새로 시작 */
+  }
+  return defaultState();
+}
+
+function save() {
+  localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+}
+
+let state = loadState();
+let currentLocation = null;
+let selectedItemId = null;
+let pianoNotesThisSession = 0;
+let toastTimer = null;
+
+function checkNewDay() {
+  const t = todayStr();
+  if (!state.daily || state.daily.date !== t) {
+    state.daily = { date: t, taekwondoCount: 0, pianoCount: 0, allowanceClaimed: false };
+    save();
+  }
+}
+checkNewDay();
+
+// ---- DOM refs ----
+const btnHome = document.getElementById("btn-home");
+const topbarAvatar = document.getElementById("topbar-avatar");
+const coinCountEl = document.getElementById("coin-count");
+const screenMap = document.getElementById("screen-map");
+const screenLocation = document.getElementById("screen-location");
+const townGrid = document.getElementById("town-grid");
+const locTitle = document.getElementById("loc-title");
+const locDesc = document.getElementById("loc-desc");
+const locActivity = document.getElementById("loc-activity");
+const roomCanvas = document.getElementById("room-canvas");
+const tabInventory = document.getElementById("tab-inventory");
+const tabShop = document.getElementById("tab-shop");
+const tabButtons = document.querySelectorAll(".tab-btn");
+const toastEl = document.getElementById("toast");
+
+// ---- 공용 UI 헬퍼 ----
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2200);
+}
+
+function bounce(selector) {
+  const el = typeof selector === "string" ? document.querySelector(selector) : selector;
+  if (!el) return;
+  el.classList.remove("bounce");
+  void el.offsetWidth;
+  el.classList.add("bounce");
+}
+
+function updateCoinDisplay() {
+  coinCountEl.textContent = state.coins;
+}
+
+function updateTopbarAvatar() {
+  mountAvatar(topbarAvatar, state.character, 40);
+}
+
+// ---- 마을 지도 ----
+function showMap() {
+  currentLocation = null;
+  screenMap.classList.remove("hidden");
+  screenLocation.classList.add("hidden");
+  renderTownGrid();
+}
+
+function renderTownGrid() {
+  townGrid.innerHTML = LOCATIONS.map(
+    (loc) => `
+    <button class="town-card theme-${loc.theme}" onclick="enterLocation('${loc.id}')">
+      <span class="town-emoji">${loc.emoji}</span>
+      <span class="town-name">${loc.name}</span>
+    </button>`
+  ).join("");
+}
+
+// ---- 장소 화면 ----
+function ensureRoomInit(locationId) {
+  if (!state.placed[locationId]) {
+    state.placed[locationId] = [];
+    const starters = ITEMS.filter((i) => i.room === locationId && i.starter);
+    starters.forEach((it, idx) => {
+      state.placed[locationId].push({ uid: uid(), itemId: it.id, x: 20 + idx * 22, y: 55 + (idx % 2) * 15 });
+    });
+    save();
+  }
+}
+
+function enterLocation(id) {
+  currentLocation = LOCATIONS.find((l) => l.id === id);
+  ensureRoomInit(id);
+  selectedItemId = null;
+  pianoNotesThisSession = 0;
+
+  screenMap.classList.add("hidden");
+  screenLocation.classList.remove("hidden");
+  screenLocation.className = "screen theme-" + currentLocation.theme;
+
+  locTitle.textContent = currentLocation.emoji + " " + currentLocation.name;
+  locDesc.textContent = currentLocation.desc;
+
+  tabButtons.forEach((b) => b.classList.remove("active"));
+  tabButtons[0].classList.add("active");
+  tabInventory.classList.remove("hidden");
+  tabShop.classList.add("hidden");
+
+  renderActivityPanel();
+  renderRoom();
+  renderInventoryTab();
+  renderShopTab();
+}
+
+btnHome.addEventListener("click", showMap);
+
+tabButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    tabButtons.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    const tab = btn.dataset.tab;
+    tabInventory.classList.toggle("hidden", tab !== "inventory");
+    tabShop.classList.toggle("hidden", tab !== "shop");
+  });
+});
+
+// ---- 방 꾸미기 (배치) ----
+function renderRoom() {
+  const placedList = state.placed[currentLocation.id] || [];
+  const itemsHtml = placedList
+    .map((p) => {
+      const item = ITEMS.find((i) => i.id === p.itemId);
+      if (!item) return "";
+      return `<div class="placed-item" style="left:${p.x}%; top:${p.y}%;" onclick="event.stopPropagation(); removePlaced('${currentLocation.id}','${p.uid}')" title="탭해서 치우기">
+        <span class="placed-emoji">${item.emoji}</span>
+      </div>`;
+    })
+    .join("");
+  const hint = selectedItemId
+    ? `<div class="room-hint active">✋ 놓을 위치를 탭하세요</div>`
+    : `<div class="room-hint">보관함에서 아이템을 골라 배치해보세요</div>`;
+  roomCanvas.innerHTML = itemsHtml + hint;
+}
+
+roomCanvas.addEventListener("click", (e) => {
+  if (!selectedItemId) return;
+  const rect = roomCanvas.getBoundingClientRect();
+  const x = ((e.clientX - rect.left) / rect.width) * 100;
+  const y = ((e.clientY - rect.top) / rect.height) * 100;
+  const clampedX = Math.min(92, Math.max(4, x));
+  const clampedY = Math.min(88, Math.max(8, y));
+  state.placed[currentLocation.id].push({ uid: uid(), itemId: selectedItemId, x: clampedX, y: clampedY });
+  selectedItemId = null;
+  save();
+  renderRoom();
+  renderInventoryTab();
+});
+
+function removePlaced(locId, itemUid) {
+  const list = state.placed[locId] || [];
+  const idx = list.findIndex((p) => p.uid === itemUid);
+  if (idx === -1) return;
+  const item = ITEMS.find((i) => i.id === list[idx].itemId);
+  list.splice(idx, 1);
+  save();
+  renderRoom();
+  if (item) toast(`${item.name}을(를) 치웠어요`);
+}
+
+function selectInvItem(id) {
+  selectedItemId = selectedItemId === id ? null : id;
+  renderInventoryTab();
+  renderRoom();
+}
+
+function renderInventoryTab() {
+  const items = ITEMS.filter((i) => i.room === currentLocation.id && state.owned[i.id]);
+  tabInventory.innerHTML = items.length
+    ? items
+        .map(
+          (it) => `
+      <button class="item-chip ${selectedItemId === it.id ? "selected" : ""}" onclick="selectInvItem('${it.id}')">
+        <span class="chip-emoji">${it.emoji}</span><span class="chip-name">${it.name}</span>
+      </button>`
+        )
+        .join("")
+    : `<p class="empty-hint">아직 보관함이 비었어요. 상점에서 아이템을 구매해보세요!</p>`;
+}
+
+function renderShopTab() {
+  const items = ITEMS.filter((i) => !i.starter && ((i.room === currentLocation.id && !i.shopAt) || i.shopAt === currentLocation.id));
+  tabShop.innerHTML = items.length
+    ? items
+        .map((it) => {
+          const owned = !!state.owned[it.id];
+          return `<div class="item-chip shop ${owned ? "owned" : ""}">
+          <span class="chip-emoji">${it.emoji}</span>
+          <span class="chip-name">${it.name}</span>
+          <span class="chip-price">${owned ? "보유중 ✓" : "🥭 " + it.price}</span>
+          ${owned ? "" : `<button class="buy-btn" onclick="buyDecor('${it.id}')">구매</button>`}
+        </div>`;
+        })
+        .join("")
+    : `<p class="empty-hint">이 장소에는 특별한 상점 아이템이 없어요.</p>`;
+}
+
+function buyDecor(id) {
+  const item = ITEMS.find((i) => i.id === id);
+  if (!item || state.owned[id]) return;
+  if (state.coins < item.price) {
+    toast("망고코인이 부족해요! 은행에서 용돈을 받아보세요 🏦");
+    return;
+  }
+  state.coins -= item.price;
+  state.owned[id] = true;
+  save();
+  updateCoinDisplay();
+  renderShopTab();
+  renderInventoryTab();
+  toast(`${item.name}을(를) 구매했어요! 보관함에서 꺼내 꾸며보세요 ✨`);
+}
+
+function buyMenu(id) {
+  const item = MENUS[currentLocation.id].find((i) => i.id === id);
+  if (!item) return;
+  if (state.coins < item.price) {
+    toast("망고코인이 부족해요!");
+    return;
+  }
+  state.coins -= item.price;
+  save();
+  updateCoinDisplay();
+  toast(`${item.emoji} ${item.name} 냠냠! 맛있게 먹었어요 😋`);
+}
+
+// ---- 장소별 특별 활동 패널 ----
+function renderActivityPanel() {
+  const loc = currentLocation;
+  checkNewDay();
+
+  if (loc.hasWardrobe) {
+    locActivity.classList.remove("hidden");
+    locActivity.innerHTML = wardrobeHTML();
+  } else if (loc.menu) {
+    locActivity.classList.remove("hidden");
+    locActivity.innerHTML = menuHTML(loc.id);
+  } else if (loc.activity === "taekwondo") {
+    locActivity.classList.remove("hidden");
+    locActivity.innerHTML = taekwondoHTML();
+  } else if (loc.activity === "piano") {
+    locActivity.classList.remove("hidden");
+    locActivity.innerHTML = pianoHTML();
+  } else if (loc.activity === "playground") {
+    locActivity.classList.remove("hidden");
+    locActivity.innerHTML = playgroundHTML();
+  } else if (loc.activity === "bank") {
+    locActivity.classList.remove("hidden");
+    locActivity.innerHTML = bankHTML();
+  } else {
+    locActivity.classList.add("hidden");
+    locActivity.innerHTML = "";
+  }
+}
+
+function wardrobeHTML() {
+  return `<div class="wardrobe">
+    <div class="avatar-preview">${renderAvatarSVG(state.character, 130)}</div>
+    <div class="swatch-group">
+      <p>머리 색</p>
+      <div class="swatches">${CHARACTER_OPTIONS.hair
+        .map((c) => `<button class="swatch ${state.character.hair === c ? "active" : ""}" style="background:${c}" onclick="setHair('${c}')"></button>`)
+        .join("")}</div>
+    </div>
+    <div class="swatch-group">
+      <p>옷 색</p>
+      <div class="swatches">${CHARACTER_OPTIONS.outfit
+        .map((c) => `<button class="swatch ${state.character.outfit === c ? "active" : ""}" style="background:${c}" onclick="setOutfit('${c}')"></button>`)
+        .join("")}</div>
+    </div>
+  </div>`;
+}
+
+function setHair(c) {
+  state.character.hair = c;
+  save();
+  updateTopbarAvatar();
+  renderActivityPanel();
+}
+function setOutfit(c) {
+  state.character.outfit = c;
+  save();
+  updateTopbarAvatar();
+  renderActivityPanel();
+}
+
+function menuHTML(locId) {
+  const items = MENUS[locId];
+  return `<div class="menu-list">${items
+    .map(
+      (it) => `
+    <button class="menu-item" onclick="buyMenu('${it.id}')">
+      <span class="menu-emoji">${it.emoji}</span>
+      <span class="menu-name">${it.name}</span>
+      <span class="menu-price">🥭 ${it.price}</span>
+    </button>`
+    )
+    .join("")}</div>`;
+}
+
+function taekwondoHTML() {
+  const belt = TAEKWONDO_BELTS[state.taekwondoBeltIndex];
+  return `<div class="activity-box">
+    <p class="belt-info">현재 띠: <b>${belt}</b> &nbsp;(오늘 연습 ${state.daily.taekwondoCount}/5)</p>
+    <div class="avatar-preview mid" id="tkd-avatar">${renderAvatarSVG(state.character, 100)}</div>
+    <div class="action-row">
+      <button class="action-btn" onclick="practiceTaekwondo()">🥋 얍! 발차기 연습</button>
+    </div>
+  </div>`;
+}
+
+function practiceTaekwondo() {
+  checkNewDay();
+  if (state.daily.taekwondoCount >= 5) {
+    toast("오늘 연습은 다 했어요! 내일 또 만나요 💪");
+    return;
+  }
+  state.daily.taekwondoCount++;
+  state.coins += 30;
+  let leveled = false;
+  if (state.daily.taekwondoCount === 5 && state.taekwondoBeltIndex < TAEKWONDO_BELTS.length - 1) {
+    state.taekwondoBeltIndex++;
+    leveled = true;
+  }
+  save();
+  updateCoinDisplay();
+  renderActivityPanel();
+  bounce("#tkd-avatar");
+  toast(leveled ? `승급했어요! 이제 ${TAEKWONDO_BELTS[state.taekwondoBeltIndex]}예요 🎉` : "얍! 기합소리와 함께 망고코인 +30 🥭");
+}
+
+function pianoHTML() {
+  const notes = [
+    ["도", 261.63],
+    ["레", 293.66],
+    ["미", 329.63],
+    ["파", 349.23],
+    ["솔", 392.0],
+    ["라", 440.0],
+    ["시", 493.88],
+    ["도", 523.25],
+  ];
+  return `<div class="activity-box">
+    <p>오늘 연습 ${state.daily.pianoCount}/5</p>
+    <div class="piano-keys">${notes.map((n) => `<button class="piano-key" onclick="playNote(${n[1]})">${n[0]}</button>`).join("")}</div>
+    <div class="action-row"><button class="action-btn" onclick="finishPiano()">🎵 연습 완료</button></div>
+  </div>`;
+}
+
+function playNote(freq) {
+  try {
+    const ctx = window.__mangoAudioCtx || (window.__mangoAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.5);
+  } catch (e) {
+    /* 오디오 미지원 환경은 조용히 무시 */
+  }
+  pianoNotesThisSession++;
+}
+
+function finishPiano() {
+  checkNewDay();
+  if (state.daily.pianoCount >= 5) {
+    toast("오늘 연습은 다 했어요! 내일 또 쳐봐요 🎹");
+    return;
+  }
+  if (pianoNotesThisSession < 3) {
+    toast("건반을 3번 이상 눌러서 연주해봐요! 🎵");
+    return;
+  }
+  pianoNotesThisSession = 0;
+  state.daily.pianoCount++;
+  state.coins += 30;
+  save();
+  updateCoinDisplay();
+  renderActivityPanel();
+  toast("연습 완료! 망고코인 +30 🥭🎶");
+}
+
+function playgroundHTML() {
+  return `<div class="activity-box">
+    <p>친구들과 신나게 놀아봐요!</p>
+    <div class="action-row">
+      <button class="action-btn" onclick="havingFun('그네')">🎠 그네 타기</button>
+      <button class="action-btn" onclick="havingFun('미끄럼틀')">🛝 미끄럼틀 타기</button>
+      <button class="action-btn" onclick="havingFun('시소')">⚖️ 시소 타기</button>
+    </div>
+  </div>`;
+}
+
+function havingFun(name) {
+  toast(`${name} 타고 신나게 놀았어요! 하하호호 🎉`);
+  bounce("#topbar-avatar");
+}
+
+function bankHTML() {
+  return `<div class="activity-box bank-box">
+    <p>지갑: 🥭 ${state.coins} &nbsp;|&nbsp; 저금통: 🥭 ${state.savings}</p>
+    <div class="action-row">
+      <button class="action-btn" onclick="claimAllowance()">${state.daily.allowanceClaimed ? "오늘 용돈 받음 ✓" : "💌 오늘의 용돈 받기 (+500)"}</button>
+    </div>
+    <div class="bank-transfer">
+      <input type="number" id="bank-amount" min="0" placeholder="금액" />
+      <button class="action-btn small" onclick="depositAmount()">저금하기 ⬇️</button>
+      <button class="action-btn small" onclick="withdrawAmount()">찾기 ⬆️</button>
+    </div>
+  </div>`;
+}
+
+function claimAllowance() {
+  checkNewDay();
+  if (state.daily.allowanceClaimed) {
+    toast("오늘은 이미 용돈을 받았어요!");
+    return;
+  }
+  state.daily.allowanceClaimed = true;
+  state.coins += 500;
+  save();
+  updateCoinDisplay();
+  renderActivityPanel();
+  toast("용돈 500 망고코인을 받았어요! 🥭💌");
+}
+
+function depositAmount() {
+  const input = document.getElementById("bank-amount");
+  const amt = Math.floor(Number(input.value));
+  if (!amt || amt <= 0) {
+    toast("금액을 입력해주세요");
+    return;
+  }
+  if (amt > state.coins) {
+    toast("가진 코인보다 많이 저금할 수 없어요");
+    return;
+  }
+  state.coins -= amt;
+  state.savings += amt;
+  save();
+  updateCoinDisplay();
+  renderActivityPanel();
+  toast(`🥭 ${amt} 저금했어요!`);
+}
+
+function withdrawAmount() {
+  const input = document.getElementById("bank-amount");
+  const amt = Math.floor(Number(input.value));
+  if (!amt || amt <= 0) {
+    toast("금액을 입력해주세요");
+    return;
+  }
+  if (amt > state.savings) {
+    toast("저금통에 그만큼 돈이 없어요");
+    return;
+  }
+  state.savings -= amt;
+  state.coins += amt;
+  save();
+  updateCoinDisplay();
+  renderActivityPanel();
+  toast(`🥭 ${amt} 찾았어요!`);
+}
+
+// ---- 시작 ----
+updateCoinDisplay();
+updateTopbarAvatar();
+showMap();
