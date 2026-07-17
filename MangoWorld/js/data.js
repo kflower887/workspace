@@ -64,6 +64,14 @@ const LOCATIONS = [
     desc: "갖고싶은 문구가 가득한 동네 문구점이에요.",
   },
   {
+    id: "mart",
+    name: "마트",
+    emoji: "🛒",
+    theme: "mart",
+    desc: "필요한 건 다 있는 군포 동네 마트예요.",
+    menu: true,
+  },
+  {
     id: "bank",
     name: "은행",
     emoji: "🏦",
@@ -135,6 +143,18 @@ const ITEMS = [
   { id: "st_gelpen", name: "젤펜 세트", emoji: "🖊️", price: 500, room: "home", shopAt: "stationery" },
   { id: "st_case", name: "필통", emoji: "🧰", price: 600, room: "home", shopAt: "stationery" },
   { id: "st_eraser", name: "캐릭터 지우개", emoji: "🧽", price: 150, room: "home", shopAt: "stationery" },
+
+  // ---- 마트 (꾸미기) ----
+  { id: "mart_cart", name: "카트", emoji: "🛒", price: 0, room: "mart", starter: true },
+  { id: "mart_shelf", name: "진열대", emoji: "🗄️", price: 0, room: "mart", starter: true },
+  { id: "mart_register", name: "계산대", emoji: "🧾", price: 200, room: "mart" },
+  { id: "mart_fridge", name: "냉장 코너", emoji: "🧊", price: 250, room: "mart" },
+
+  // ---- 마트에서 사서 집에 두는 생필품/장난감 ----
+  { id: "mart_tissue", name: "휴지", emoji: "🧻", price: 200, room: "home", shopAt: "mart" },
+  { id: "mart_toy", name: "장난감 자동차", emoji: "🚗", price: 700, room: "home", shopAt: "mart" },
+  { id: "mart_basket", name: "과일 바구니", emoji: "🧺", price: 400, room: "home", shopAt: "mart" },
+  { id: "mart_balloon", name: "풍선", emoji: "🎈", price: 300, room: "home", shopAt: "mart" },
 ];
 
 // 카페 / 음식점 메뉴 (소모성 - 사서 바로 먹기)
@@ -151,6 +171,12 @@ const MENUS = {
     { id: "f_ramen", name: "라면", emoji: "🍜", price: 4000 },
     { id: "f_eomuk", name: "어묵꼬치", emoji: "🍢", price: 1500 },
     { id: "f_sundae", name: "순대", emoji: "🍖", price: 3000 },
+  ],
+  mart: [
+    { id: "g_snack", name: "과자", emoji: "🍿", price: 1500 },
+    { id: "g_icecream", name: "아이스크림", emoji: "🍦", price: 2000 },
+    { id: "g_milk", name: "딸기우유", emoji: "🥛", price: 1200 },
+    { id: "g_fruit", name: "과일 한 봉지", emoji: "🍎", price: 2500 },
   ],
 };
 

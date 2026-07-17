@@ -133,6 +133,7 @@ html, body {
 .theme-restaurant { background: linear-gradient(145deg, #ff9b85, #ef5b45); }
 .theme-stationery { background: linear-gradient(145deg, #a0e7e5, #45c4c0); }
 .theme-bank { background: linear-gradient(145deg, #b5c99a, #7e9c6f); }
+.theme-mart { background: linear-gradient(145deg, #a3a8ff, #6c63ff); }
 
 /* ---- 장소 화면 ---- */
 .location-header h2 { margin: 0 0 2px; font-size: 20px; }
