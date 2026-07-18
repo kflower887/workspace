@@ -85,6 +85,8 @@ const tabInventory = document.getElementById("tab-inventory");
 const tabShop = document.getElementById("tab-shop");
 const tabButtons = document.querySelectorAll(".tab-btn");
 const toastEl = document.getElementById("toast");
+const coinDisplayEl = document.getElementById("coin-display");
+const fxLayer = document.getElementById("fx-layer");
 
 // ---- 공용 UI 헬퍼 ----
 function toast(msg) {
@@ -100,6 +102,68 @@ function bounce(selector) {
   el.classList.remove("bounce");
   void el.offsetWidth;
   el.classList.add("bounce");
+}
+
+function playScreenEnter(el) {
+  if (!el) return;
+  el.classList.remove("enter");
+  void el.offsetWidth;
+  el.classList.add("enter");
+}
+
+function spawnFx(el) {
+  fxLayer.appendChild(el);
+  el.addEventListener("animationend", () => el.remove());
+}
+
+function pulseCoinDisplay() {
+  coinDisplayEl.classList.remove("pulse");
+  void coinDisplayEl.offsetWidth;
+  coinDisplayEl.classList.add("pulse");
+}
+
+function floatCoinPopup(amount) {
+  const rect = coinDisplayEl.getBoundingClientRect();
+  const el = document.createElement("div");
+  el.className = "coin-popup " + (amount >= 0 ? "gain" : "spend");
+  el.textContent = (amount >= 0 ? "+" : "") + amount + " 🥭";
+  el.style.left = rect.left + rect.width / 2 + "px";
+  el.style.top = rect.bottom + "px";
+  spawnFx(el);
+  pulseCoinDisplay();
+}
+
+function spawnSparkles(anchorEl) {
+  if (!anchorEl) return;
+  const rect = anchorEl.getBoundingClientRect();
+  const emojis = ["✨", "🌟", "💫"];
+  for (let i = 0; i < 6; i++) {
+    const el = document.createElement("div");
+    el.className = "sparkle-burst";
+    el.textContent = emojis[i % emojis.length];
+    el.style.left = rect.left + rect.width / 2 + (Math.random() * 44 - 22) + "px";
+    el.style.top = rect.top + rect.height / 2 + "px";
+    el.style.animationDelay = i * 0.05 + "s";
+    spawnFx(el);
+  }
+}
+
+function kickAnimate(containerSelector) {
+  const container = document.querySelector(containerSelector);
+  if (!container) return;
+  const foot = container.querySelector(".avatar-foot-r");
+  if (!foot) return;
+  foot.classList.remove("kick-anim");
+  void foot.offsetWidth;
+  foot.classList.add("kick-anim");
+}
+
+function triggerBurst(selector) {
+  const el = typeof selector === "string" ? document.querySelector(selector) : selector;
+  if (!el) return;
+  el.classList.remove("show");
+  void el.offsetWidth;
+  el.classList.add("show");
 }
 
 function updateCoinDisplay() {
@@ -125,6 +189,7 @@ function showMap() {
   screenLocation.classList.add("hidden");
   renderTownGrid();
   renderMapIntro();
+  playScreenEnter(screenMap);
 }
 
 function renderMapIntro() {
@@ -178,6 +243,7 @@ function enterLocation(id) {
   renderRoom();
   renderInventoryTab();
   renderShopTab();
+  playScreenEnter(screenLocation);
 }
 
 btnHome.addEventListener("click", showMap);
@@ -199,7 +265,7 @@ function renderRoom() {
     .map((p) => {
       const item = ITEMS.find((i) => i.id === p.itemId);
       if (!item) return "";
-      return `<div class="placed-item" style="left:${p.x}%; top:${p.y}%;" onclick="event.stopPropagation(); removePlaced('${currentLocation.id}','${p.uid}')" title="탭해서 치우기">
+      return `<div class="placed-item" style="left:${p.x}%; top:${p.y}%;" onclick="event.stopPropagation(); requestRemovePlaced('${currentLocation.id}','${p.uid}', event.currentTarget)" title="탭해서 치우기">
         <span class="placed-emoji">${item.emoji}</span>
       </div>`;
     })
@@ -223,6 +289,12 @@ roomCanvas.addEventListener("click", (e) => {
   renderRoom();
   renderInventoryTab();
 });
+
+function requestRemovePlaced(locId, itemUid, el) {
+  if (!el || el.classList.contains("removing")) return;
+  el.classList.add("removing");
+  setTimeout(() => removePlaced(locId, itemUid), 200);
+}
 
 function removePlaced(locId, itemUid) {
   const list = state.placed[locId] || [];
@@ -283,6 +355,7 @@ function buyDecor(id) {
   state.owned[id] = true;
   save();
   updateCoinDisplay();
+  floatCoinPopup(-item.price);
   renderShopTab();
   renderInventoryTab();
   toast(`${item.name}을(를) 구매했어요! 보관함에서 꺼내 꾸며보세요 ✨`);
@@ -298,6 +371,7 @@ function buyMenu(id) {
   state.coins -= item.price;
   save();
   updateCoinDisplay();
+  floatCoinPopup(-item.price);
   toast(`${item.emoji} ${item.name} 냠냠! 맛있게 먹었어요 😋`);
 }
 
@@ -449,11 +523,17 @@ function saveCharacterForm() {
     state.activeCharacterId = c.id;
     toast(`${name}을(를) 만들었어요! 🎉`);
   }
+  const isNew = !editingCharacterId;
   charFormOpen = false;
   editingCharacterId = null;
   save();
   updateTopbarAvatar();
   renderActivityPanel();
+  if (isNew) {
+    spawnSparkles(topbarAvatar);
+    const chipEl = document.querySelector(".char-chip.active");
+    if (chipEl) chipEl.classList.add("char-new-anim");
+  }
 }
 
 function selectCharacter(id) {
@@ -500,7 +580,10 @@ function taekwondoHTML() {
   const belt = TAEKWONDO_BELTS[state.taekwondoBeltIndex];
   return `<div class="activity-box">
     <p class="belt-info">현재 띠: <b>${belt}</b> &nbsp;(오늘 연습 ${state.daily.taekwondoCount}/5)</p>
-    <div class="avatar-preview mid" id="tkd-avatar">${renderAvatarSVG(active, 100)}</div>
+    <div class="avatar-preview mid" id="tkd-avatar">
+      ${renderAvatarSVG(active, 100)}
+      <div class="impact-burst" id="tkd-burst"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    </div>
     <div class="action-row">
       <button class="action-btn" onclick="practiceTaekwondo()">🥋 얍! 발차기 연습</button>
     </div>
@@ -529,7 +612,9 @@ function practiceTaekwondo() {
   save();
   updateCoinDisplay();
   renderActivityPanel();
-  bounce("#tkd-avatar");
+  kickAnimate("#tkd-avatar");
+  triggerBurst("#tkd-burst");
+  floatCoinPopup(30);
   toast(leveled ? `승급했어요! 이제 ${TAEKWONDO_BELTS[state.taekwondoBeltIndex]}예요 🎉` : "얍! 기합소리와 함께 망고코인 +30 🥭");
 }
 
@@ -546,12 +631,12 @@ function pianoHTML() {
   ];
   return `<div class="activity-box">
     <p>오늘 연습 ${state.daily.pianoCount}/5</p>
-    <div class="piano-keys">${notes.map((n) => `<button class="piano-key" onclick="playNote(${n[1]})">${n[0]}</button>`).join("")}</div>
+    <div class="piano-keys">${notes.map((n) => `<button class="piano-key" onclick="playNote(event, ${n[1]}, '${n[0]}')">${n[0]}</button>`).join("")}</div>
     <div class="action-row"><button class="action-btn" onclick="finishPiano()">🎵 연습 완료</button></div>
   </div>`;
 }
 
-function playNote(freq) {
+function playNote(e, freq, label) {
   try {
     const ctx = window.__mangoAudioCtx || (window.__mangoAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
     const osc = ctx.createOscillator();
@@ -564,10 +649,24 @@ function playNote(freq) {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.5);
-  } catch (e) {
+  } catch (err) {
     /* 오디오 미지원 환경은 조용히 무시 */
   }
   pianoNotesThisSession++;
+
+  const btn = e.currentTarget;
+  btn.classList.remove("key-press");
+  void btn.offsetWidth;
+  btn.classList.add("key-press");
+  setTimeout(() => btn.classList.remove("key-press"), 150);
+
+  const rect = btn.getBoundingClientRect();
+  const note = document.createElement("div");
+  note.className = "note-pop";
+  note.textContent = "🎵" + label;
+  note.style.left = rect.left + rect.width / 2 + "px";
+  note.style.top = rect.top + "px";
+  spawnFx(note);
 }
 
 function finishPiano() {
@@ -585,6 +684,7 @@ function finishPiano() {
   state.coins += 30;
   save();
   updateCoinDisplay();
+  floatCoinPopup(30);
   renderActivityPanel();
   toast("연습 완료! 망고코인 +30 🥭🎶");
 }
@@ -629,6 +729,7 @@ function claimAllowance() {
   state.coins += 500;
   save();
   updateCoinDisplay();
+  floatCoinPopup(500);
   renderActivityPanel();
   toast("용돈 500 망고코인을 받았어요! 🥭💌");
 }
