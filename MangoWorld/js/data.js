@@ -148,6 +148,10 @@ const ITEMS = [
   { id: "stx_ruler", name: "자", icon: "stx_ruler", emoji: "📏", price: 100, room: "stationery" },
   { id: "stx_scissors", name: "가위", icon: "stx_scissors", emoji: "✂️", price: 120, room: "stationery" },
   { id: "stx_pouch", name: "필통", icon: "stx_pouch", emoji: "🧳", price: 200, room: "stationery" },
+  { id: "stx_slime_strawberry", name: "딸기 슬라임", icon: "stx_slime_strawberry", emoji: "🍓", price: 280, room: "stationery" },
+  { id: "stx_slime_cloud", name: "구름 슬라임", icon: "stx_slime_cloud", emoji: "☁️", price: 280, room: "stationery" },
+  { id: "stx_slime_coffee", name: "커피 슬라임", icon: "stx_slime_coffee", emoji: "🍫", price: 280, room: "stationery" },
+  { id: "stx_slime_orange", name: "귤 슬라임", icon: "stx_slime_orange", emoji: "🍊", price: 280, room: "stationery" },
 
   // ---- 문구야놀자에서 사서 집에 꾸미는 아이템 ----
   { id: "st_pencil", name: "캐릭터 연필", emoji: "✏️", price: 300, room: "home", shopAt: "stationery" },

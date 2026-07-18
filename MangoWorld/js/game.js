@@ -18,6 +18,7 @@ function defaultState() {
   return {
     coins: 10000,
     savings: 0,
+    savingsUpdatedAt: Date.now(),
     characters: [],
     activeCharacterId: null,
     owned,
@@ -974,6 +975,7 @@ function havingFun(name) {
 function bankHTML() {
   return `<div class="activity-box bank-box">
     <p>지갑: 🥭 ${state.coins} &nbsp;|&nbsp; 저금통: 🥭 ${state.savings}</p>
+    ${state.savings > 0 ? `<p class="interest-note">📈 저금통은 1초마다 🥭 100씩 저절로 불어나요!</p>` : ""}
     <div class="action-row">
       <button class="action-btn" onclick="claimAllowance()">${state.daily.allowanceClaimed ? "오늘 용돈 받음 ✓" : "💌 오늘의 용돈 받기 (+500)"}</button>
     </div>
@@ -984,6 +986,28 @@ function bankHTML() {
     </div>
   </div>`;
 }
+
+function accrueSavingsInterest() {
+  const now = Date.now();
+  if (!state.savingsUpdatedAt) state.savingsUpdatedAt = now;
+  if (state.savings <= 0) {
+    state.savingsUpdatedAt = now;
+    return false;
+  }
+  const elapsedSec = Math.floor((now - state.savingsUpdatedAt) / 1000);
+  if (elapsedSec <= 0) return false;
+  state.savings += elapsedSec * 100;
+  state.savingsUpdatedAt += elapsedSec * 1000;
+  save();
+  return true;
+}
+
+setInterval(() => {
+  const changed = accrueSavingsInterest();
+  if (changed) {
+    if (currentLocation && currentLocation.id === "bank") renderActivityPanel();
+  }
+}, 1000);
 
 function claimAllowance() {
   checkNewDay();
@@ -1001,6 +1025,7 @@ function claimAllowance() {
 }
 
 function depositAmount() {
+  accrueSavingsInterest();
   const input = document.getElementById("bank-amount");
   const amt = Math.floor(Number(input.value));
   if (!amt || amt <= 0) {
@@ -1013,13 +1038,15 @@ function depositAmount() {
   }
   state.coins -= amt;
   state.savings += amt;
+  state.savingsUpdatedAt = Date.now();
   save();
   updateCoinDisplay();
   renderActivityPanel();
-  toast(`🥭 ${amt} 저금했어요!`);
+  toast(`🥭 ${amt} 저금했어요! 이제 1초마다 100씩 불어나요 📈`);
 }
 
 function withdrawAmount() {
+  accrueSavingsInterest();
   const input = document.getElementById("bank-amount");
   const amt = Math.floor(Number(input.value));
   if (!amt || amt <= 0) {
@@ -1032,13 +1059,30 @@ function withdrawAmount() {
   }
   state.savings -= amt;
   state.coins += amt;
+  state.savingsUpdatedAt = Date.now();
   save();
   updateCoinDisplay();
   renderActivityPanel();
   toast(`🥭 ${amt} 찾았어요!`);
 }
 
+// ---- 전체화면 ----
+function requestFullscreenOnce() {
+  document.removeEventListener("pointerdown", requestFullscreenOnce);
+  const el = document.documentElement;
+  const request = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+  if (request) {
+    try {
+      request.call(el).catch(() => {});
+    } catch (err) {
+      /* 풀스크린 미지원/거부 시 조용히 무시 */
+    }
+  }
+}
+document.addEventListener("pointerdown", requestFullscreenOnce);
+
 // ---- 시작 ----
+accrueSavingsInterest();
 updateCoinDisplay();
 updateTopbarAvatar();
 showMap();

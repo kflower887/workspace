@@ -15,6 +15,7 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100%;
+  height: 100dvh;
   font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
   background: var(--cream);
   color: var(--ink);
@@ -25,6 +26,7 @@ html, body {
   max-width: 480px;
   margin: 0 auto;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--cream);
@@ -508,6 +510,7 @@ img.chip-emoji.icon-img { width: 28px; height: 28px; object-fit: contain; }
   box-shadow: none;
 }
 
+.interest-note { font-size: 11.5px; color: var(--mango-dark); font-weight: 700; margin: -4px 0 2px; }
 .bank-transfer { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center; }
 .bank-transfer input {
   width: 90px;
@@ -703,6 +706,7 @@ img.chip-emoji.icon-img { width: 28px; height: 28px; object-fit: contain; }
   #app {
     max-width: 100%;
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
   }
   #topbar { padding: 6px 14px; }
