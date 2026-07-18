@@ -22,8 +22,9 @@ function defaultState() {
     activeCharacterId: null,
     owned,
     placed: {},
+    charPlaced: {},
     taekwondoBeltIndex: 0,
-    daily: { date: todayStr(), taekwondoCount: 0, pianoCount: 0, allowanceClaimed: false },
+    daily: { date: todayStr(), taekwondoCount: 0, pianoCount: 0, allowanceClaimed: false, jobCounts: {}, choreCounts: {} },
   };
 }
 
@@ -54,18 +55,21 @@ function save() {
 let state = loadState();
 let currentLocation = null;
 let selectedItemId = null;
+let selectedCharId = null;
 let pianoNotesThisSession = 0;
 let toastTimer = null;
 let charFormOpen = false;
 let editingCharacterId = null;
-let charFormDraft = { name: "", preset: null };
+let charFormDraft = { name: "", preset: null, accessory: null };
 
 function checkNewDay() {
   const t = todayStr();
   if (!state.daily || state.daily.date !== t) {
-    state.daily = { date: t, taekwondoCount: 0, pianoCount: 0, allowanceClaimed: false };
+    state.daily = { date: t, taekwondoCount: 0, pianoCount: 0, allowanceClaimed: false, jobCounts: {}, choreCounts: {} };
     save();
   }
+  if (!state.daily.jobCounts) state.daily.jobCounts = {};
+  if (!state.daily.choreCounts) state.daily.choreCounts = {};
 }
 checkNewDay();
 
@@ -178,8 +182,19 @@ function getActiveCharacter() {
   return state.characters.find((c) => c.id === state.activeCharacterId) || null;
 }
 
+function accessoryOverlayHtml(character, size) {
+  if (!character || !character.accessory) return "";
+  const acc = ACCESSORY_OPTIONS.find((a) => a.id === character.accessory);
+  if (!acc) return "";
+  return `<span class="avatar-accessory" style="font-size:${Math.round(size * 0.34)}px;">${acc.emoji}</span>`;
+}
+
+function avatarWithAccessoryHtml(character, size) {
+  return `<span class="avatar-wrap" style="width:${size}px;height:${size}px;">${renderAvatarSVG(character, size)}${accessoryOverlayHtml(character, size)}</span>`;
+}
+
 function updateTopbarAvatar() {
-  mountAvatar(topbarAvatar, getActiveCharacter(), 40);
+  topbarAvatar.innerHTML = avatarWithAccessoryHtml(getActiveCharacter(), 40);
 }
 
 function escapeHtml(s) {
@@ -236,12 +251,16 @@ function ensureRoomInit(locationId) {
     });
     save();
   }
+  if (!state.charPlaced[locationId]) {
+    state.charPlaced[locationId] = [];
+  }
 }
 
 function enterLocation(id) {
   currentLocation = LOCATIONS.find((l) => l.id === id);
   ensureRoomInit(id);
   selectedItemId = null;
+  selectedCharId = null;
   pianoNotesThisSession = 0;
 
   screenMap.classList.add("hidden");
@@ -276,33 +295,124 @@ tabButtons.forEach((btn) => {
   });
 });
 
-// ---- 방 꾸미기 (배치) ----
+// ---- 방 꾸미기 (배치 + 드래그 이동) ----
+function makeDraggable(el, { onTap, onDragEnd }) {
+  const DRAG_THRESHOLD = 6;
+  let startX = 0,
+    startY = 0,
+    dragging = false,
+    active = false;
+
+  el.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
+    active = true;
+    dragging = false;
+    startX = e.clientX;
+    startY = e.clientY;
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch (err) {
+      /* 캡처 미지원 환경은 무시 */
+    }
+  });
+
+  el.addEventListener("pointermove", (e) => {
+    if (!active) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (!dragging && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+      dragging = true;
+      el.classList.add("dragging");
+    }
+    if (dragging) {
+      const rect = roomCanvas.getBoundingClientRect();
+      const x = Math.min(94, Math.max(2, ((e.clientX - rect.left) / rect.width) * 100));
+      const y = Math.min(92, Math.max(4, ((e.clientY - rect.top) / rect.height) * 100));
+      el.style.left = x + "%";
+      el.style.top = y + "%";
+      el.dataset.pendingX = x;
+      el.dataset.pendingY = y;
+    }
+  });
+
+  const finish = () => {
+    if (!active) return;
+    active = false;
+    el.classList.remove("dragging");
+    if (dragging) {
+      onDragEnd(parseFloat(el.dataset.pendingX), parseFloat(el.dataset.pendingY));
+    } else {
+      onTap();
+    }
+    dragging = false;
+  };
+
+  el.addEventListener("pointerup", finish);
+  el.addEventListener("pointercancel", finish);
+}
+
 function renderRoom() {
   const placedList = state.placed[currentLocation.id] || [];
   const itemsHtml = placedList
     .map((p) => {
       const item = ITEMS.find((i) => i.id === p.itemId);
       if (!item) return "";
-      return `<div class="placed-item" style="left:${p.x}%; top:${p.y}%;" onclick="event.stopPropagation(); requestRemovePlaced('${currentLocation.id}','${p.uid}', event.currentTarget)" title="탭해서 치우기">
+      return `<div class="placed-item" data-kind="item" data-uid="${p.uid}" style="left:${p.x}%; top:${p.y}%;" title="탭해서 치우기 · 드래그로 이동">
         ${itemVisualHtml(item, "placed-emoji")}
       </div>`;
     })
     .join("");
+
+  const charPlacedList = state.charPlaced[currentLocation.id] || [];
+  const charsHtml = charPlacedList
+    .map((p) => {
+      const c = state.characters.find((x) => x.id === p.charId);
+      if (!c) return "";
+      return `<div class="placed-item placed-char" data-kind="char" data-uid="${p.uid}" style="left:${p.x}%; top:${p.y}%;" title="탭해서 치우기 · 드래그로 이동">
+        ${avatarWithAccessoryHtml(c, 92)}
+      </div>`;
+    })
+    .join("");
+
   const hint = selectedItemId
     ? `<div class="room-hint active">✋ 놓을 위치를 탭하세요</div>`
-    : `<div class="room-hint">보관함에서 아이템을 골라 배치해보세요</div>`;
-  roomCanvas.innerHTML = itemsHtml + hint;
+    : selectedCharId
+    ? `<div class="room-hint active">✋ 캐릭터를 놓을 위치를 탭하세요</div>`
+    : `<div class="room-hint">보관함에서 아이템이나 캐릭터를 골라 배치해보세요</div>`;
+
+  roomCanvas.innerHTML = itemsHtml + charsHtml + hint;
+
+  roomCanvas.querySelectorAll(".placed-item").forEach((el) => {
+    const kind = el.dataset.kind;
+    const itemUid = el.dataset.uid;
+    makeDraggable(el, {
+      onTap: () => {
+        if (kind === "char") requestRemoveCharPlaced(currentLocation.id, itemUid, el);
+        else requestRemovePlaced(currentLocation.id, itemUid, el);
+      },
+      onDragEnd: (x, y) => {
+        if (kind === "char") commitCharPosition(currentLocation.id, itemUid, x, y);
+        else commitPlacedPosition(currentLocation.id, itemUid, x, y);
+      },
+    });
+  });
 }
 
 roomCanvas.addEventListener("click", (e) => {
-  if (!selectedItemId) return;
+  if (e.target.closest(".placed-item")) return;
+  if (!selectedItemId && !selectedCharId) return;
   const rect = roomCanvas.getBoundingClientRect();
   const x = ((e.clientX - rect.left) / rect.width) * 100;
   const y = ((e.clientY - rect.top) / rect.height) * 100;
   const clampedX = Math.min(92, Math.max(4, x));
   const clampedY = Math.min(88, Math.max(8, y));
-  state.placed[currentLocation.id].push({ uid: uid(), itemId: selectedItemId, x: clampedX, y: clampedY });
-  selectedItemId = null;
+  if (selectedCharId) {
+    state.charPlaced[currentLocation.id].push({ uid: uid(), charId: selectedCharId, x: clampedX, y: clampedY });
+    selectedCharId = null;
+  } else {
+    state.placed[currentLocation.id].push({ uid: uid(), itemId: selectedItemId, x: clampedX, y: clampedY });
+    selectedItemId = null;
+  }
   save();
   renderRoom();
   renderInventoryTab();
@@ -325,15 +435,72 @@ function removePlaced(locId, itemUid) {
   if (item) toast(`${item.name}을(를) 치웠어요`);
 }
 
+function commitPlacedPosition(locId, itemUid, x, y) {
+  const list = state.placed[locId] || [];
+  const p = list.find((p) => p.uid === itemUid);
+  if (p) {
+    p.x = x;
+    p.y = y;
+    save();
+  }
+}
+
+function requestRemoveCharPlaced(locId, itemUid, el) {
+  if (!el || el.classList.contains("removing")) return;
+  el.classList.add("removing");
+  setTimeout(() => removeCharPlaced(locId, itemUid), 200);
+}
+
+function removeCharPlaced(locId, itemUid) {
+  const list = state.charPlaced[locId] || [];
+  const idx = list.findIndex((p) => p.uid === itemUid);
+  if (idx === -1) return;
+  list.splice(idx, 1);
+  save();
+  renderRoom();
+  toast("캐릭터를 화면에서 치웠어요");
+}
+
+function commitCharPosition(locId, itemUid, x, y) {
+  const list = state.charPlaced[locId] || [];
+  const p = list.find((p) => p.uid === itemUid);
+  if (p) {
+    p.x = x;
+    p.y = y;
+    save();
+  }
+}
+
 function selectInvItem(id) {
   selectedItemId = selectedItemId === id ? null : id;
+  selectedCharId = null;
   renderInventoryTab();
   renderRoom();
 }
 
+function selectCharForPlacement(id) {
+  selectedCharId = selectedCharId === id ? null : id;
+  selectedItemId = null;
+  renderInventoryTab();
+  renderRoom();
+}
+
+function charChipsForPlacementHTML() {
+  if (!state.characters.length) return "";
+  return `<p class="section-label">🧍 캐릭터 배치 (탭해서 놓기)</p>
+    <div class="char-place-row">${state.characters
+      .map(
+        (c) => `
+      <button class="item-chip char-place-chip ${selectedCharId === c.id ? "selected" : ""}" onclick="selectCharForPlacement('${c.id}')">
+        ${avatarWithAccessoryHtml(c, 28)}<span class="chip-name">${escapeHtml(c.name)}</span>
+      </button>`
+      )
+      .join("")}</div>`;
+}
+
 function renderInventoryTab() {
   const items = ITEMS.filter((i) => i.room === currentLocation.id && state.owned[i.id]);
-  tabInventory.innerHTML = items.length
+  const itemsHtml = items.length
     ? items
         .map(
           (it) => `
@@ -343,6 +510,7 @@ function renderInventoryTab() {
         )
         .join("")
     : `<p class="empty-hint">아직 보관함이 비었어요. 상점에서 아이템을 구매해보세요!</p>`;
+  tabInventory.innerHTML = charChipsForPlacementHTML() + itemsHtml;
 }
 
 function renderShopTab() {
@@ -401,9 +569,6 @@ function renderActivityPanel() {
   if (loc.hasWardrobe) {
     locActivity.classList.remove("hidden");
     locActivity.innerHTML = wardrobeHTML();
-  } else if (loc.menu) {
-    locActivity.classList.remove("hidden");
-    locActivity.innerHTML = menuHTML(loc.id);
   } else if (loc.activity === "taekwondo") {
     locActivity.classList.remove("hidden");
     locActivity.innerHTML = taekwondoHTML();
@@ -416,6 +581,12 @@ function renderActivityPanel() {
   } else if (loc.activity === "bank") {
     locActivity.classList.remove("hidden");
     locActivity.innerHTML = bankHTML();
+  } else if (loc.menu) {
+    locActivity.classList.remove("hidden");
+    locActivity.innerHTML = `<div class="activity-box">${jobBlockHTML(loc.id)}</div>` + menuHTML(loc.id);
+  } else if (JOBS[loc.id]) {
+    locActivity.classList.remove("hidden");
+    locActivity.innerHTML = jobHTML(loc.id);
   } else {
     locActivity.classList.add("hidden");
     locActivity.innerHTML = "";
@@ -430,14 +601,78 @@ function wardrobeHTML() {
       ${chips || '<p class="empty-hint">아직 만든 캐릭터가 없어요. 아래에서 첫 캐릭터를 만들어보세요!</p>'}
     </div>
     <button class="action-btn" onclick="${charFormOpen ? "closeCharForm()" : "openCharCreateForm()"}">${charFormOpen ? "취소" : "➕ 새 캐릭터 만들기"}</button>
-    ${charFormOpen ? characterFormHTML() : ""}
+    ${charFormOpen ? characterFormHTML() : choresBlockHTML()}
   </div>`;
+}
+
+function choresBlockHTML() {
+  return `<div class="chores-box">
+    <p class="wardrobe-title">집안일 알바</p>
+    <div class="action-row">
+      ${CHORES.map((c) => {
+        const count = state.daily.choreCounts[c.id] || 0;
+        const done = count >= 5;
+        return `<button class="action-btn small" onclick="doChore('${c.id}')" ${done ? "disabled" : ""}>${c.emoji} ${c.label} (${count}/5)</button>`;
+      }).join("")}
+    </div>
+  </div>`;
+}
+
+function doChore(id) {
+  checkNewDay();
+  const count = state.daily.choreCounts[id] || 0;
+  if (count >= 5) {
+    toast("오늘 이 집안일은 다 했어요! 내일 또 해봐요 💪");
+    return;
+  }
+  const chore = CHORES.find((c) => c.id === id);
+  state.daily.choreCounts[id] = count + 1;
+  state.coins += chore.reward;
+  save();
+  updateCoinDisplay();
+  floatCoinPopup(chore.reward);
+  renderActivityPanel();
+  bounce("#topbar-avatar");
+  toast(`${chore.emoji} ${chore.label} 완료! 망고코인 +${chore.reward} 🥭`);
+}
+
+function jobBlockHTML(locId) {
+  const job = JOBS[locId];
+  if (!job) return "";
+  const count = state.daily.jobCounts[locId] || 0;
+  const done = count >= 5;
+  return `<p class="job-count">오늘 알바 ${count}/5</p>
+    <div class="action-row">
+      <button class="action-btn" onclick="doJob('${locId}')" ${done ? "disabled" : ""}>${job.emoji} ${job.label} (+${job.reward})</button>
+    </div>`;
+}
+
+function jobHTML(locId) {
+  return `<div class="activity-box">${jobBlockHTML(locId)}</div>`;
+}
+
+function doJob(locId) {
+  checkNewDay();
+  const count = state.daily.jobCounts[locId] || 0;
+  if (count >= 5) {
+    toast("오늘 알바는 다 했어요! 내일 또 해봐요 💪");
+    return;
+  }
+  const job = JOBS[locId];
+  state.daily.jobCounts[locId] = count + 1;
+  state.coins += job.reward;
+  save();
+  updateCoinDisplay();
+  floatCoinPopup(job.reward);
+  renderActivityPanel();
+  bounce("#topbar-avatar");
+  toast(`${job.emoji} ${job.label} 완료! 망고코인 +${job.reward} 🥭`);
 }
 
 function characterChipHTML(c) {
   const isActive = c.id === state.activeCharacterId;
   return `<div class="char-chip ${isActive ? "active" : ""}">
-    <div class="char-chip-avatar" onclick="selectCharacter('${c.id}')">${renderAvatarSVG(c, 56)}</div>
+    <div class="char-chip-avatar" onclick="selectCharacter('${c.id}')">${avatarWithAccessoryHtml(c, 56)}</div>
     <div class="char-chip-name" onclick="selectCharacter('${c.id}')">${c.gender === "boy" ? "👦" : "👧"} ${escapeHtml(c.name)}</div>
     <div class="char-chip-actions">
       <button class="chip-icon-btn" onclick="startEditCharacter('${c.id}')" title="수정">✏️</button>
@@ -447,15 +682,19 @@ function characterChipHTML(c) {
 }
 
 function characterFormHTML() {
-  const preview = charFormDraft.preset ? { preset: charFormDraft.preset } : null;
+  const preview = charFormDraft.preset ? { preset: charFormDraft.preset, accessory: charFormDraft.accessory } : null;
   const girls = CHARACTER_PRESETS.filter((p) => p.gender === "girl");
   const boys = CHARACTER_PRESETS.filter((p) => p.gender === "boy");
   const presetTile = (p) => `
     <button class="preset-tile ${charFormDraft.preset === p.id ? "active" : ""}" onclick="setDraftPreset('${p.id}')" title="${p.label}">
       <img src="img/characters/${p.id}.webp" alt="${p.label}" />
     </button>`;
+  const accessoryTile = (a) => `
+    <button class="preset-tile accessory-tile ${charFormDraft.accessory === a.id ? "active" : ""}" onclick="setDraftAccessory('${a.id}')" title="${a.label}">
+      <span class="accessory-emoji">${a.emoji}</span>
+    </button>`;
   return `<div class="char-form">
-    <div class="avatar-preview">${renderAvatarSVG(preview, 110)}</div>
+    <div class="avatar-preview">${renderAvatarSVG(preview, 110)}${accessoryOverlayHtml(preview, 110)}</div>
     <input id="char-name-input" class="char-name-input" type="text" maxlength="8" placeholder="이름을 입력해주세요" value="${escapeHtml(charFormDraft.name)}" />
     <div class="swatch-group">
       <p>👧 여자아이</p>
@@ -464,6 +703,15 @@ function characterFormHTML() {
     <div class="swatch-group">
       <p>👦 남자아이</p>
       <div class="preset-grid">${boys.map(presetTile).join("")}</div>
+    </div>
+    <div class="swatch-group">
+      <p>✨ 꾸미기 (선택)</p>
+      <div class="preset-grid">
+        <button class="preset-tile accessory-tile ${!charFormDraft.accessory ? "active" : ""}" onclick="setDraftAccessory(null)" title="없음">
+          <span class="accessory-emoji">🚫</span>
+        </button>
+        ${ACCESSORY_OPTIONS.map(accessoryTile).join("")}
+      </div>
     </div>
     <div class="action-row">
       <button class="action-btn" onclick="saveCharacterForm()">${editingCharacterId ? "수정 완료 ✅" : "만들기 ✨"}</button>
@@ -475,7 +723,7 @@ function characterFormHTML() {
 function openCharCreateForm() {
   charFormOpen = true;
   editingCharacterId = null;
-  charFormDraft = { name: "", preset: null };
+  charFormDraft = { name: "", preset: null, accessory: null };
   renderActivityPanel();
 }
 
@@ -484,7 +732,7 @@ function startEditCharacter(id) {
   if (!c) return;
   charFormOpen = true;
   editingCharacterId = id;
-  charFormDraft = { name: c.name, preset: c.preset };
+  charFormDraft = { name: c.name, preset: c.preset, accessory: c.accessory || null };
   renderActivityPanel();
 }
 
@@ -502,6 +750,12 @@ function syncDraftName() {
 function setDraftPreset(id) {
   syncDraftName();
   charFormDraft.preset = id;
+  renderActivityPanel();
+}
+
+function setDraftAccessory(id) {
+  syncDraftName();
+  charFormDraft.accessory = id;
   renderActivityPanel();
 }
 
@@ -524,10 +778,11 @@ function saveCharacterForm() {
       c.name = name;
       c.preset = charFormDraft.preset;
       c.gender = gender;
+      c.accessory = charFormDraft.accessory || null;
     }
     toast(`${name} 정보를 수정했어요!`);
   } else {
-    const c = { id: uid(), name, preset: charFormDraft.preset, gender };
+    const c = { id: uid(), name, preset: charFormDraft.preset, gender, accessory: charFormDraft.accessory || null };
     state.characters.push(c);
     state.activeCharacterId = c.id;
     toast(`${name}을(를) 만들었어요! 🎉`);
@@ -590,7 +845,7 @@ function taekwondoHTML() {
   return `<div class="activity-box">
     <p class="belt-info">현재 띠: <b>${belt}</b> &nbsp;(오늘 연습 ${state.daily.taekwondoCount}/5)</p>
     <div class="avatar-preview mid" id="tkd-avatar">
-      ${renderAvatarSVG(active, 100)}
+      ${avatarWithAccessoryHtml(active, 100)}
       <div class="impact-burst" id="tkd-burst"><span></span><span></span><span></span><span></span><span></span><span></span></div>
     </div>
     <div class="action-row">
@@ -706,6 +961,8 @@ function playgroundHTML() {
       <button class="action-btn" onclick="havingFun('미끄럼틀')">🛝 미끄럼틀 타기</button>
       <button class="action-btn" onclick="havingFun('시소')">⚖️ 시소 타기</button>
     </div>
+    <hr class="activity-divider" />
+    ${jobBlockHTML("playground")}
   </div>`;
 }
 

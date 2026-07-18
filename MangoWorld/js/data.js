@@ -218,3 +218,29 @@ const CHARACTER_PRESETS = [
 ];
 
 const TAEKWONDO_BELTS = ["흰띠", "노란띠", "초록띠", "파란띠", "빨간띠", "검은띠"];
+
+// 캐릭터 꾸미기 액세서리 (이모지 오버레이)
+const ACCESSORY_OPTIONS = [
+  { id: "ribbon", emoji: "🎀", label: "리본" },
+  { id: "crown", emoji: "👑", label: "왕관" },
+  { id: "glasses", emoji: "😎", label: "선글라스" },
+  { id: "cap", emoji: "🧢", label: "모자" },
+  { id: "flower", emoji: "🌸", label: "꽃" },
+];
+
+// 우리집 집안일 알바 (청소 / 빨래 / 공부)
+const CHORES = [
+  { id: "clean", label: "청소하기", emoji: "🧹", reward: 35 },
+  { id: "laundry", label: "빨래 개기", emoji: "🧺", reward: 35 },
+  { id: "study", label: "공부하기", emoji: "📖", reward: 40 },
+];
+
+// 다른 장소의 알바하기 (장소마다 다른 컨셉, 하루 5회 제한)
+const JOBS = {
+  school: { label: "숙제 도와주기 알바", emoji: "📚", reward: 40 },
+  cafe: { label: "카페 홀서빙 알바", emoji: "☕", reward: 45 },
+  restaurant: { label: "서빙 알바", emoji: "🍽️", reward: 45 },
+  stationery: { label: "문구점 정리 알바", emoji: "✏️", reward: 40 },
+  mart: { label: "마트 진열 알바", emoji: "🛒", reward: 40 },
+  playground: { label: "동생 돌보기 알바", emoji: "🧒", reward: 35 },
+};
