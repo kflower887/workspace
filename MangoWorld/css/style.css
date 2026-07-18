@@ -258,6 +258,55 @@ html, body {
 }
 .swatch.active { border-color: var(--mango-dark); }
 
+/* ---- 캐릭터 관리 (우리집) ---- */
+.wardrobe-title { margin: 0 0 8px; font-size: 13.5px; font-weight: 800; color: #7a5c3c; text-align: center; }
+.char-list { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 10px; }
+.char-chip {
+  background: #fff3d6;
+  border: 2px solid transparent;
+  border-radius: 16px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 88px;
+}
+.char-chip.active { border-color: var(--mango-dark); background: #ffe3ad; }
+.char-chip-avatar { cursor: pointer; }
+.char-chip-name { font-size: 11.5px; font-weight: 700; cursor: pointer; text-align: center; word-break: break-all; }
+.char-chip-actions { display: flex; gap: 4px; }
+.chip-icon-btn {
+  border: none;
+  background: rgba(255,255,255,0.7);
+  border-radius: 8px;
+  font-size: 11px;
+  padding: 3px 6px;
+  cursor: pointer;
+}
+
+.char-form { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 10px; }
+.char-name-input {
+  width: 90%;
+  padding: 10px;
+  border-radius: 12px;
+  border: 2px solid #ffe0a3;
+  font-size: 14px;
+  text-align: center;
+}
+.gender-toggle { display: flex; gap: 8px; justify-content: center; }
+.gender-btn {
+  border: 2px solid #ffe0a3;
+  background: #fff;
+  color: #a97a3d;
+  font-weight: 700;
+  font-size: 12.5px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.gender-btn.active { background: var(--mango-dark); border-color: var(--mango-dark); color: #fff; }
+
 .menu-list { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .menu-item {
   border: none;

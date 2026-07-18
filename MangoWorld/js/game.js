@@ -18,7 +18,8 @@ function defaultState() {
   return {
     coins: 3000,
     savings: 0,
-    character: { hair: CHARACTER_OPTIONS.hair[0], outfit: CHARACTER_OPTIONS.outfit[0] },
+    characters: [],
+    activeCharacterId: null,
     owned,
     placed: {},
     taekwondoBeltIndex: 0,
@@ -31,6 +32,13 @@ function loadState() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (raw) {
       const saved = JSON.parse(raw);
+      // 예전 저장 형식(고정 캐릭터 1명)을 캐릭터 목록으로 변환
+      if (saved.character && !saved.characters) {
+        const legacy = { id: uid(), name: "나", gender: "girl", hair: saved.character.hair, outfit: saved.character.outfit };
+        saved.characters = [legacy];
+        saved.activeCharacterId = legacy.id;
+        delete saved.character;
+      }
       return Object.assign(defaultState(), saved);
     }
   } catch (e) {
@@ -48,6 +56,9 @@ let currentLocation = null;
 let selectedItemId = null;
 let pianoNotesThisSession = 0;
 let toastTimer = null;
+let charFormOpen = false;
+let editingCharacterId = null;
+let charFormDraft = { name: "", gender: "girl", hair: CHARACTER_OPTIONS.hair[0], outfit: CHARACTER_OPTIONS.outfit[0] };
 
 function checkNewDay() {
   const t = todayStr();
@@ -65,6 +76,7 @@ const coinCountEl = document.getElementById("coin-count");
 const screenMap = document.getElementById("screen-map");
 const screenLocation = document.getElementById("screen-location");
 const townGrid = document.getElementById("town-grid");
+const mapLead = document.getElementById("map-lead");
 const locTitle = document.getElementById("loc-title");
 const locDesc = document.getElementById("loc-desc");
 const locActivity = document.getElementById("loc-activity");
@@ -94,8 +106,16 @@ function updateCoinDisplay() {
   coinCountEl.textContent = state.coins;
 }
 
+function getActiveCharacter() {
+  return state.characters.find((c) => c.id === state.activeCharacterId) || null;
+}
+
 function updateTopbarAvatar() {
-  mountAvatar(topbarAvatar, state.character, 40);
+  mountAvatar(topbarAvatar, getActiveCharacter(), 40);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 }
 
 // ---- 마을 지도 ----
@@ -104,6 +124,14 @@ function showMap() {
   screenMap.classList.remove("hidden");
   screenLocation.classList.add("hidden");
   renderTownGrid();
+  renderMapIntro();
+}
+
+function renderMapIntro() {
+  const active = getActiveCharacter();
+  mapLead.textContent = active
+    ? `${active.name}과 함께 군포 곳곳을 자유롭게 탐험해보세요!`
+    : "나만의 캐릭터를 만들고 군포 곳곳을 자유롭게 탐험해보세요! (우리집에서 캐릭터 만들기)";
 }
 
 function renderTownGrid() {
@@ -303,34 +331,153 @@ function renderActivityPanel() {
 }
 
 function wardrobeHTML() {
+  const chips = state.characters.map((c) => characterChipHTML(c)).join("");
   return `<div class="wardrobe">
-    <div class="avatar-preview">${renderAvatarSVG(state.character, 130)}</div>
+    <p class="wardrobe-title">우리 가족 캐릭터</p>
+    <div class="char-list">
+      ${chips || '<p class="empty-hint">아직 만든 캐릭터가 없어요. 아래에서 첫 캐릭터를 만들어보세요!</p>'}
+    </div>
+    <button class="action-btn" onclick="${charFormOpen ? "closeCharForm()" : "openCharCreateForm()"}">${charFormOpen ? "취소" : "➕ 새 캐릭터 만들기"}</button>
+    ${charFormOpen ? characterFormHTML() : ""}
+  </div>`;
+}
+
+function characterChipHTML(c) {
+  const isActive = c.id === state.activeCharacterId;
+  return `<div class="char-chip ${isActive ? "active" : ""}">
+    <div class="char-chip-avatar" onclick="selectCharacter('${c.id}')">${renderAvatarSVG(c, 56)}</div>
+    <div class="char-chip-name" onclick="selectCharacter('${c.id}')">${c.gender === "boy" ? "👦" : "👧"} ${escapeHtml(c.name)}</div>
+    <div class="char-chip-actions">
+      <button class="chip-icon-btn" onclick="startEditCharacter('${c.id}')" title="수정">✏️</button>
+      <button class="chip-icon-btn" onclick="deleteCharacterConfirm('${c.id}')" title="삭제">🗑️</button>
+    </div>
+  </div>`;
+}
+
+function characterFormHTML() {
+  return `<div class="char-form">
+    <div class="avatar-preview">${renderAvatarSVG(charFormDraft, 110)}</div>
+    <input id="char-name-input" class="char-name-input" type="text" maxlength="8" placeholder="이름을 입력해주세요" value="${escapeHtml(charFormDraft.name)}" />
+    <div class="swatch-group">
+      <p>성별</p>
+      <div class="gender-toggle">
+        <button class="gender-btn ${charFormDraft.gender === "girl" ? "active" : ""}" onclick="setDraftGender('girl')">👧 여자아이</button>
+        <button class="gender-btn ${charFormDraft.gender === "boy" ? "active" : ""}" onclick="setDraftGender('boy')">👦 남자아이</button>
+      </div>
+    </div>
     <div class="swatch-group">
       <p>머리 색</p>
       <div class="swatches">${CHARACTER_OPTIONS.hair
-        .map((c) => `<button class="swatch ${state.character.hair === c ? "active" : ""}" style="background:${c}" onclick="setHair('${c}')"></button>`)
+        .map((c) => `<button class="swatch ${charFormDraft.hair === c ? "active" : ""}" style="background:${c}" onclick="setDraftHair('${c}')"></button>`)
         .join("")}</div>
     </div>
     <div class="swatch-group">
       <p>옷 색</p>
       <div class="swatches">${CHARACTER_OPTIONS.outfit
-        .map((c) => `<button class="swatch ${state.character.outfit === c ? "active" : ""}" style="background:${c}" onclick="setOutfit('${c}')"></button>`)
+        .map((c) => `<button class="swatch ${charFormDraft.outfit === c ? "active" : ""}" style="background:${c}" onclick="setDraftOutfit('${c}')"></button>`)
         .join("")}</div>
+    </div>
+    <div class="action-row">
+      <button class="action-btn" onclick="saveCharacterForm()">${editingCharacterId ? "수정 완료 ✅" : "만들기 ✨"}</button>
+      <button class="action-btn small" onclick="closeCharForm()">취소</button>
     </div>
   </div>`;
 }
 
-function setHair(c) {
-  state.character.hair = c;
+function openCharCreateForm() {
+  charFormOpen = true;
+  editingCharacterId = null;
+  charFormDraft = { name: "", gender: "girl", hair: CHARACTER_OPTIONS.hair[0], outfit: CHARACTER_OPTIONS.outfit[0] };
+  renderActivityPanel();
+}
+
+function startEditCharacter(id) {
+  const c = state.characters.find((x) => x.id === id);
+  if (!c) return;
+  charFormOpen = true;
+  editingCharacterId = id;
+  charFormDraft = { name: c.name, gender: c.gender, hair: c.hair, outfit: c.outfit };
+  renderActivityPanel();
+}
+
+function closeCharForm() {
+  charFormOpen = false;
+  editingCharacterId = null;
+  renderActivityPanel();
+}
+
+function syncDraftName() {
+  const el = document.getElementById("char-name-input");
+  if (el) charFormDraft.name = el.value;
+}
+
+function setDraftGender(g) {
+  syncDraftName();
+  charFormDraft.gender = g;
+  renderActivityPanel();
+}
+function setDraftHair(c) {
+  syncDraftName();
+  charFormDraft.hair = c;
+  renderActivityPanel();
+}
+function setDraftOutfit(c) {
+  syncDraftName();
+  charFormDraft.outfit = c;
+  renderActivityPanel();
+}
+
+function saveCharacterForm() {
+  syncDraftName();
+  const name = charFormDraft.name.trim();
+  if (!name) {
+    toast("이름을 입력해주세요");
+    return;
+  }
+  if (editingCharacterId) {
+    const c = state.characters.find((x) => x.id === editingCharacterId);
+    if (c) {
+      c.name = name;
+      c.gender = charFormDraft.gender;
+      c.hair = charFormDraft.hair;
+      c.outfit = charFormDraft.outfit;
+    }
+    toast(`${name} 정보를 수정했어요!`);
+  } else {
+    const c = { id: uid(), name, gender: charFormDraft.gender, hair: charFormDraft.hair, outfit: charFormDraft.outfit };
+    state.characters.push(c);
+    state.activeCharacterId = c.id;
+    toast(`${name}을(를) 만들었어요! 🎉`);
+  }
+  charFormOpen = false;
+  editingCharacterId = null;
   save();
   updateTopbarAvatar();
   renderActivityPanel();
 }
-function setOutfit(c) {
-  state.character.outfit = c;
+
+function selectCharacter(id) {
+  state.activeCharacterId = id;
   save();
   updateTopbarAvatar();
   renderActivityPanel();
+}
+
+function deleteCharacterConfirm(id) {
+  const c = state.characters.find((x) => x.id === id);
+  if (!c) return;
+  state.characters = state.characters.filter((x) => x.id !== id);
+  if (state.activeCharacterId === id) {
+    state.activeCharacterId = state.characters.length ? state.characters[0].id : null;
+  }
+  if (editingCharacterId === id) {
+    charFormOpen = false;
+    editingCharacterId = null;
+  }
+  save();
+  updateTopbarAvatar();
+  renderActivityPanel();
+  toast(`${c.name}을(를) 삭제했어요`);
 }
 
 function menuHTML(locId) {
@@ -348,13 +495,21 @@ function menuHTML(locId) {
 }
 
 function taekwondoHTML() {
+  const active = getActiveCharacter();
+  if (!active) return characterGateHTML();
   const belt = TAEKWONDO_BELTS[state.taekwondoBeltIndex];
   return `<div class="activity-box">
     <p class="belt-info">현재 띠: <b>${belt}</b> &nbsp;(오늘 연습 ${state.daily.taekwondoCount}/5)</p>
-    <div class="avatar-preview mid" id="tkd-avatar">${renderAvatarSVG(state.character, 100)}</div>
+    <div class="avatar-preview mid" id="tkd-avatar">${renderAvatarSVG(active, 100)}</div>
     <div class="action-row">
       <button class="action-btn" onclick="practiceTaekwondo()">🥋 얍! 발차기 연습</button>
     </div>
+  </div>`;
+}
+
+function characterGateHTML() {
+  return `<div class="activity-box">
+    <p>먼저 <b>우리집</b>에서 캐릭터를 만들어보세요! 🏠✨</p>
   </div>`;
 }
 

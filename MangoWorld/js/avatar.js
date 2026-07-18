@@ -1,9 +1,26 @@
-// 망고월드 - 김하린 캐릭터 아바타 (SVG 생성)
+// 망고월드 - 캐릭터 아바타 (SVG 생성)
 
 function renderAvatarSVG(character, size) {
+  const s = size || 64;
+  if (!character) return renderPlaceholderAvatarSVG(s);
+
   const hair = character.hair;
   const outfit = character.outfit;
-  const s = size || 64;
+  const isBoy = character.gender === "boy";
+
+  const hairShape = isBoy
+    ? `<path d="M50 15 C33 15 25 27 26 41 C26 46 27 50 29 53 L29 41 C29 30 38 23 50 23 C62 23 71 30 71 41 L71 53 C73 50 74 46 74 41 C75 27 67 15 50 15 Z" fill="${hair}" />`
+    : `<path d="M50 14 C30 14 22 30 24 48 C26 46 29 44 30 40 C31 50 33 54 36 57
+             C34 46 35 38 38 33 C40 40 40 46 42 50
+             C41 40 43 32 47 28 C47 38 49 44 51 48
+             C51 38 53 32 56 29 C55 39 57 46 60 52
+             C62 47 63 42 64 38 C66 42 68 46 70 48
+             C73 30 66 14 50 14 Z" fill="${hair}" />
+       <circle cx="22" cy="46" r="4.5" fill="${hair}" />
+       <circle cx="78" cy="46" r="4.5" fill="${hair}" />
+       <path d="M17 42 L23 46 L17 50 Z" fill="#ff5d8f" />
+       <path d="M83 42 L77 46 L83 50 Z" fill="#ff5d8f" />`;
+
   return `
   <svg viewBox="0 0 100 100" width="${s}" height="${s}" xmlns="http://www.w3.org/2000/svg">
     <!-- 몸 / 옷 -->
@@ -28,19 +45,17 @@ function renderAvatarSVG(character, size) {
     <!-- 웃는 입 -->
     <path d="M43 46 Q50 52 57 46" stroke="#c1543f" stroke-width="2.2" fill="none" stroke-linecap="round" />
 
-    <!-- 머리카락 (뒤) -->
-    <path d="M50 14 C30 14 22 30 24 48 C26 46 29 44 30 40 C31 50 33 54 36 57
-             C34 46 35 38 38 33 C40 40 40 46 42 50
-             C41 40 43 32 47 28 C47 38 49 44 51 48
-             C51 38 53 32 56 29 C55 39 57 46 60 52
-             C62 47 63 42 64 38 C66 42 68 46 70 48
-             C73 30 66 14 50 14 Z" fill="${hair}" />
+    <!-- 머리카락 -->
+    ${hairShape}
+  </svg>`;
+}
 
-    <!-- 양갈래 머리 리본 -->
-    <circle cx="22" cy="46" r="4.5" fill="${hair}" />
-    <circle cx="78" cy="46" r="4.5" fill="${hair}" />
-    <path d="M17 42 L23 46 L17 50 Z" fill="#ff5d8f" />
-    <path d="M83 42 L77 46 L83 50 Z" fill="#ff5d8f" />
+function renderPlaceholderAvatarSVG(size) {
+  const s = size || 64;
+  return `
+  <svg viewBox="0 0 100 100" width="${s}" height="${s}" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="50" cy="50" r="44" fill="none" stroke="#d8c6a3" stroke-width="4" stroke-dasharray="8 6" />
+    <text x="50" y="64" font-size="42" text-anchor="middle" fill="#d8c6a3">?</text>
   </svg>`;
 }
 

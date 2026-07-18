@@ -6,7 +6,7 @@ const LOCATIONS = [
     name: "우리집",
     emoji: "🏠",
     theme: "home",
-    desc: "당정동 행복빌라 302호, 하린이의 아늑한 우리집이에요.",
+    desc: "당정동 행복빌라 302호, 우리 가족의 아늑한 우리집이에요.",
     hasWardrobe: true,
   },
   {
@@ -14,7 +14,7 @@ const LOCATIONS = [
     name: "당정초등학교",
     emoji: "🏫",
     theme: "school",
-    desc: "하린이가 다니는 당정초등학교 2학년 3반 교실이에요.",
+    desc: "당정초등학교 2학년 3반 교실이에요. 여기서 공부하고 놀아요.",
   },
   {
     id: "cafe",
