@@ -21,13 +21,12 @@
     </div>
   </header>
 
-  <!-- 마을 지도 화면 -->
+  <!-- 마을 지도 화면 (일러스트 지도 이미지 위에 장소별 핫스팟 배치) -->
   <main id="screen-map" class="screen">
-    <div class="map-intro">
-      <h1>망고월드 <span class="sub">군포 당정동 이야기</span></h1>
-      <p class="lead" id="map-lead">나만의 캐릭터를 만들고 군포 곳곳을 자유롭게 탐험해보세요!</p>
+    <div id="map-canvas">
+      <div id="map-hotspots"></div>
+      <p class="map-caption" id="map-lead"></p>
     </div>
-    <div id="town-grid"></div>
   </main>
 
   <!-- 장소 화면 (동적으로 채워짐) -->

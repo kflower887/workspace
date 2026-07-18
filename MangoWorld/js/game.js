@@ -80,7 +80,7 @@ const topbarAvatar = document.getElementById("topbar-avatar");
 const coinCountEl = document.getElementById("coin-count");
 const screenMap = document.getElementById("screen-map");
 const screenLocation = document.getElementById("screen-location");
-const townGrid = document.getElementById("town-grid");
+const mapHotspots = document.getElementById("map-hotspots");
 const mapLead = document.getElementById("map-lead");
 const locTitle = document.getElementById("loc-title");
 const locDesc = document.getElementById("loc-desc");
@@ -214,7 +214,7 @@ function showMap() {
   appEl.classList.remove("immersive");
   screenMap.classList.remove("hidden");
   screenLocation.classList.add("hidden");
-  renderTownGrid();
+  renderMapHotspots();
   renderMapIntro();
   playScreenEnter(screenMap);
 }
@@ -232,15 +232,50 @@ function renderMapIntro() {
     : "나만의 캐릭터를 만들고 군포 곳곳을 자유롭게 탐험해보세요! (우리집에서 캐릭터 만들기)";
 }
 
-function renderTownGrid() {
-  townGrid.innerHTML = LOCATIONS.map(
-    (loc) => `
-    <button class="town-card theme-${loc.theme}" onclick="enterLocation('${loc.id}')">
-      <span class="town-emoji">${loc.emoji}</span>
-      <span class="town-name">${loc.name}</span>
-    </button>`
-  ).join("");
+function renderMapHotspots() {
+  mapHotspots.innerHTML = LOCATIONS.map((loc, idx) => {
+    return `<button class="map-hotspot" data-loc-id="${loc.id}" style="animation-delay:${idx * 0.04}s;" onclick="enterLocation('${loc.id}')" title="${loc.name}" aria-label="${loc.name}"></button>`;
+  }).join("");
+  requestAnimationFrame(positionMapHotspots);
 }
+
+// 지도 이미지는 background-size:contain으로 표시되므로(가로/세로 어느 화면비에서도
+// 잘리지 않게), 핫스팟 좌표도 실제로 그려지는 이미지 영역(letterbox 제외)을
+// 계산해서 픽셀 단위로 맞춰줘야 정확히 건물 위에 위치합니다.
+const MAP_IMG_W = 1400;
+const MAP_IMG_H = 788;
+
+function positionMapHotspots() {
+  const canvas = document.getElementById("map-canvas");
+  if (!canvas || screenMap.classList.contains("hidden")) return;
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const containerRatio = rect.width / rect.height;
+  const imgRatio = MAP_IMG_W / MAP_IMG_H;
+  let renderW, renderH;
+  if (imgRatio > containerRatio) {
+    renderW = rect.width;
+    renderH = rect.width / imgRatio;
+  } else {
+    renderH = rect.height;
+    renderW = rect.height * imgRatio;
+  }
+  const offsetX = (rect.width - renderW) / 2;
+  const offsetY = (rect.height - renderH) / 2;
+  document.querySelectorAll(".map-hotspot").forEach((el) => {
+    const loc = LOCATIONS.find((l) => l.id === el.dataset.locId);
+    if (!loc) return;
+    const p = loc.mapPos;
+    el.style.left = offsetX + (p.x / 100) * renderW + "px";
+    el.style.top = offsetY + (p.y / 100) * renderH + "px";
+    el.style.width = (p.w / 100) * renderW + "px";
+    el.style.height = (p.h / 100) * renderH + "px";
+  });
+}
+
+window.addEventListener("resize", () => {
+  if (!screenMap.classList.contains("hidden")) positionMapHotspots();
+});
 
 // ---- 장소 화면 ----
 function ensureRoomInit(locationId) {

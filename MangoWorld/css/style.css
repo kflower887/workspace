@@ -105,73 +105,48 @@ html, body {
 }
 .screen.enter { animation: screen-in 0.28s ease; }
 
-/* ---- 마을 지도 ---- */
-.map-intro {
-  padding-top: 46px; /* 좌우로 떠 있는 홈/월렛 캡슐과 겹치지 않도록 여백 확보 */
-}
-.map-intro h1 {
-  margin: 0 0 4px;
-  font-size: 24px;
-  color: var(--mango-dark);
-}
-.map-intro .sub {
-  display: block;
-  font-size: 13px;
-  color: #a97a3d;
-  font-weight: 500;
-}
-.map-intro .lead {
-  margin: 8px 0 0;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-#town-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-.town-card {
-  border: none;
-  border-radius: var(--radius);
-  padding: 16px 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  box-shadow: var(--shadow-deep), inset 0 -4px 0 rgba(0,0,0,0.12), inset 0 3px 0 rgba(255,255,255,0.35);
-  color: #fff;
-  font-weight: 700;
-  font-size: 12.5px;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+/* ---- 마을 지도 (일러스트 지도 이미지 + 위치별 핫스팟) ---- */
+#map-canvas {
   position: relative;
+  flex: 1;
+  min-height: 260px;
+  border-radius: var(--radius);
+  background: #bfe4fb center / contain no-repeat;
+  background-image: url('../img/map-town.webp');
+  box-shadow: inset 0 0 0 3px #fff, var(--shadow-deep);
   overflow: hidden;
-  transition: transform 0.15s cubic-bezier(.34,1.56,.64,1), box-shadow 0.15s ease;
-  opacity: 0;
-  animation: card-in 0.4s cubic-bezier(.34,1.56,.64,1) forwards;
 }
-.town-card::before {
-  content: "";
+.map-hotspot {
   position: absolute;
-  top: -30%; left: -30%;
-  width: 70%; height: 70%;
-  background: radial-gradient(circle, rgba(255,255,255,0.4), transparent 70%);
-  pointer-events: none;
+  transform: translate(-50%, -50%);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s ease;
+  opacity: 0;
+  animation: map-hotspot-in 0.4s cubic-bezier(.34,1.56,.64,1) forwards;
 }
-.town-card:nth-child(1) { animation-delay: 0.02s; }
-.town-card:nth-child(2) { animation-delay: 0.06s; }
-.town-card:nth-child(3) { animation-delay: 0.10s; }
-.town-card:nth-child(4) { animation-delay: 0.14s; }
-.town-card:nth-child(5) { animation-delay: 0.18s; }
-.town-card:nth-child(6) { animation-delay: 0.22s; }
-.town-card:nth-child(7) { animation-delay: 0.26s; }
-.town-card:nth-child(8) { animation-delay: 0.30s; }
-.town-card:nth-child(9) { animation-delay: 0.34s; }
-.town-card:nth-child(10) { animation-delay: 0.38s; }
-.town-card:active { transform: scale(0.92); box-shadow: var(--shadow), inset 0 -2px 0 rgba(0,0,0,0.12); }
-.town-emoji { font-size: 30px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.15)); animation: icon-bob 3.4s ease-in-out infinite; }
-.town-card:nth-child(odd) .town-emoji { animation-delay: 0.4s; }
+.map-hotspot:active { transform: translate(-50%, -50%) scale(0.9); }
+.map-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255,255,255,0.88);
+  padding: 6px 14px;
+  border-radius: 999px;
+  color: #7a5c3c;
+  white-space: nowrap;
+  max-width: 92%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: var(--shadow);
+  z-index: 2;
+}
 
 .theme-home { background: linear-gradient(145deg, #ffafcc, #ff8fab); }
 .theme-school { background: linear-gradient(145deg, #8ecae6, #4ea8de); }
@@ -621,6 +596,11 @@ img.chip-emoji.icon-img { width: 28px; height: 28px; object-fit: contain; }
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+@keyframes map-hotspot-in {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
 @keyframes icon-bob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-3px); }
@@ -716,14 +696,7 @@ img.chip-emoji.icon-img { width: 28px; height: 28px; object-fit: contain; }
 
   .screen { padding: 10px 16px; gap: 10px; overflow: hidden; }
 
-  #screen-map { overflow-y: auto; }
-  .map-intro { padding-top: 38px; }
-  .map-intro h1 { font-size: 18px; margin: 0; }
-  .map-intro .sub { font-size: 11px; }
-  .map-intro .lead { font-size: 12px; margin: 4px 0 0; }
-  #town-grid { grid-template-columns: repeat(5, 1fr); gap: 10px; }
-  .town-card { padding: 10px 4px; font-size: 11px; }
-  .town-emoji { font-size: 24px; }
+  .map-caption { font-size: 11px; padding: 5px 12px; bottom: 6px; }
 
   #screen-location {
     height: 100%;

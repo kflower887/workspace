@@ -1,5 +1,6 @@
 // 망고월드 - 게임 데이터 (장소 / 아이템 / 메뉴)
 
+// mapPos: 지도 일러스트(img/map-town.webp) 위 건물 위치/탭 영역 (전부 %)
 const LOCATIONS = [
   {
     id: "home",
@@ -8,6 +9,7 @@ const LOCATIONS = [
     theme: "home",
     desc: "당정동 행복빌라 302호, 우리 가족의 아늑한 우리집이에요.",
     hasWardrobe: true,
+    mapPos: { x: 34.2, y: 22.6, w: 16, h: 30 },
   },
   {
     id: "school",
@@ -15,6 +17,7 @@ const LOCATIONS = [
     emoji: "🏫",
     theme: "school",
     desc: "당정초등학교 2학년 3반 교실이에요. 여기서 공부하고 놀아요.",
+    mapPos: { x: 14.6, y: 32.1, w: 17, h: 32 },
   },
   {
     id: "cafe",
@@ -23,6 +26,7 @@ const LOCATIONS = [
     theme: "cafe",
     desc: "셀프 키오스크로 주문하는 당정동 무인카페예요.",
     menu: true,
+    mapPos: { x: 10.3, y: 59.0, w: 17, h: 30 },
   },
   {
     id: "taekwondo",
@@ -31,6 +35,7 @@ const LOCATIONS = [
     theme: "taekwondo",
     desc: "얍! 기합소리 가득한 군포 태권도학원이에요.",
     activity: "taekwondo",
+    mapPos: { x: 33.7, y: 63.4, w: 17, h: 32 },
   },
   {
     id: "playground",
@@ -39,6 +44,7 @@ const LOCATIONS = [
     theme: "playground",
     desc: "친구들과 뛰노는 아파트 단지 놀이터예요.",
     activity: "playground",
+    mapPos: { x: 16.1, y: 85, w: 17, h: 26 },
   },
   {
     id: "piano",
@@ -47,6 +53,7 @@ const LOCATIONS = [
     theme: "piano",
     desc: "도레미파솔라시도~ 피아노학원이에요.",
     activity: "piano",
+    mapPos: { x: 49.8, y: 84, w: 17, h: 26 },
   },
   {
     id: "restaurant",
@@ -55,6 +62,7 @@ const LOCATIONS = [
     theme: "restaurant",
     desc: "떡볶이부터 라면까지! 군포 분식&식당이에요.",
     menu: true,
+    mapPos: { x: 79.1, y: 83, w: 18, h: 26 },
   },
   {
     id: "stationery",
@@ -62,6 +70,7 @@ const LOCATIONS = [
     emoji: "✏️",
     theme: "stationery",
     desc: "갖고싶은 문구가 가득한 동네 문구점이에요.",
+    mapPos: { x: 89.4, y: 59.0, w: 17, h: 32 },
   },
   {
     id: "mart",
@@ -70,6 +79,7 @@ const LOCATIONS = [
     theme: "mart",
     desc: "필요한 건 다 있는 군포 동네 마트예요.",
     menu: true,
+    mapPos: { x: 64.9, y: 23.4, w: 17, h: 30 },
   },
   {
     id: "bank",
@@ -78,6 +88,7 @@ const LOCATIONS = [
     theme: "bank",
     desc: "용돈을 저금하고 찾을 수 있는 군포 은행이에요.",
     activity: "bank",
+    mapPos: { x: 85.2, y: 33.0, w: 16, h: 32 },
   },
 ];
 
