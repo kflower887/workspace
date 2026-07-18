@@ -243,7 +243,7 @@ function renderMapHotspots() {
 // 잘리지 않게), 핫스팟 좌표도 실제로 그려지는 이미지 영역(letterbox 제외)을
 // 계산해서 픽셀 단위로 맞춰줘야 정확히 건물 위에 위치합니다.
 const MAP_IMG_W = 1400;
-const MAP_IMG_H = 788;
+const MAP_IMG_H = 791;
 
 function positionMapHotspots() {
   const canvas = document.getElementById("map-canvas");
@@ -1010,7 +1010,7 @@ function havingFun(name) {
 function bankHTML() {
   return `<div class="activity-box bank-box">
     <p id="bank-balance-text">지갑: 🥭 ${state.coins} &nbsp;|&nbsp; 저금통: 🥭 ${state.savings}</p>
-    <p class="interest-note" id="bank-interest-note" style="${state.savings > 0 ? "" : "display:none;"}">📈 저금통은 5초마다 🥭 100씩 저절로 불어나요!</p>
+    <p class="interest-note" id="bank-interest-note" style="${state.savings > 0 ? "" : "display:none;"}">📈 저금통은 1분마다 🥭 100씩 저절로 불어나요!</p>
     <div class="action-row">
       <button class="action-btn" onclick="claimAllowance()">${state.daily.allowanceClaimed ? "오늘 용돈 받음 ✓" : "💌 오늘의 용돈 받기 (+500)"}</button>
     </div>
@@ -1022,7 +1022,7 @@ function bankHTML() {
   </div>`;
 }
 
-const INTEREST_TICK_MS = 5000;
+const INTEREST_TICK_MS = 60000;
 const INTEREST_AMOUNT = 100;
 
 function accrueSavingsInterest() {
