@@ -406,20 +406,24 @@ img.chip-emoji.icon-img { width: 28px; height: 28px; object-fit: contain; }
   font-size: 14px;
   text-align: center;
 }
-.gender-toggle { display: flex; gap: 8px; justify-content: center; }
-.gender-btn {
-  border: 2px solid #ffe0a3;
-  background: #fff;
-  color: #a97a3d;
-  font-weight: 700;
-  font-size: 12.5px;
-  padding: 8px 12px;
-  border-radius: 999px;
+.preset-grid { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.preset-tile {
+  border: 3px solid transparent;
+  background: #fff3d6;
+  border-radius: 14px;
+  padding: 3px;
   cursor: pointer;
-  transition: transform 0.12s ease;
+  width: 54px;
+  height: 66px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  transition: transform 0.12s ease, border-color 0.12s ease;
 }
-.gender-btn:active { transform: scale(0.92); }
-.gender-btn.active { background: var(--mango-dark); border-color: var(--mango-dark); color: #fff; }
+.preset-tile img { width: 100%; height: 100%; object-fit: contain; object-position: bottom; display: block; }
+.preset-tile.active { border-color: var(--mango-dark); background: #ffe3ad; }
+.preset-tile:active { transform: scale(0.92); }
 
 .menu-list { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .menu-item {
@@ -612,6 +616,14 @@ img.chip-emoji.icon-img { width: 28px; height: 28px; object-fit: contain; }
   65% { transform: rotate(18deg); }
   100% { transform: rotate(0deg); }
 }
+
+@keyframes kick-whole {
+  0% { transform: rotate(0deg) scale(1); }
+  30% { transform: rotate(-8deg) scale(1.08); }
+  60% { transform: rotate(5deg) scale(0.97); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+.kick-anim-whole { animation: kick-whole 0.4s ease; }
 
 @keyframes spark-burst {
   0% { transform: rotate(var(--r, 0deg)) translateY(0) scale(1); opacity: 1; }

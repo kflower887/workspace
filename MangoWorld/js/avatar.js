@@ -15,6 +15,11 @@ function renderAvatarSVG(character, size) {
   const s = size || 64;
   if (!character) return renderPlaceholderAvatarSVG(s);
 
+  if (character.preset) {
+    return `<img class="avatar-svg avatar-preset-img" src="img/characters/${character.preset}.webp" style="width:${s}px; height:${s}px; object-fit:contain;" alt="" />`;
+  }
+
+  // 예전 저장 데이터(프리셋 없이 색상으로 생성된 캐릭터)를 위한 기존 방식
   const hair = character.hair;
   const outfit = character.outfit;
   const isBoy = character.gender === "boy";

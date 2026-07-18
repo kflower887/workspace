@@ -58,7 +58,7 @@ let pianoNotesThisSession = 0;
 let toastTimer = null;
 let charFormOpen = false;
 let editingCharacterId = null;
-let charFormDraft = { name: "", gender: "girl", hair: CHARACTER_OPTIONS.hair[0], outfit: CHARACTER_OPTIONS.outfit[0] };
+let charFormDraft = { name: "", preset: null };
 
 function checkNewDay() {
   const t = todayStr();
@@ -154,10 +154,12 @@ function kickAnimate(containerSelector) {
   const container = document.querySelector(containerSelector);
   if (!container) return;
   const foot = container.querySelector(".avatar-foot-r");
-  if (!foot) return;
-  foot.classList.remove("kick-anim");
-  void foot.offsetWidth;
-  foot.classList.add("kick-anim");
+  const target = foot || container.querySelector(".avatar-preset-img");
+  if (!target) return;
+  const cls = foot ? "kick-anim" : "kick-anim-whole";
+  target.classList.remove(cls);
+  void target.offsetWidth;
+  target.classList.add(cls);
 }
 
 function triggerBurst(selector) {
@@ -445,27 +447,23 @@ function characterChipHTML(c) {
 }
 
 function characterFormHTML() {
+  const preview = charFormDraft.preset ? { preset: charFormDraft.preset } : null;
+  const girls = CHARACTER_PRESETS.filter((p) => p.gender === "girl");
+  const boys = CHARACTER_PRESETS.filter((p) => p.gender === "boy");
+  const presetTile = (p) => `
+    <button class="preset-tile ${charFormDraft.preset === p.id ? "active" : ""}" onclick="setDraftPreset('${p.id}')" title="${p.label}">
+      <img src="img/characters/${p.id}.webp" alt="${p.label}" />
+    </button>`;
   return `<div class="char-form">
-    <div class="avatar-preview">${renderAvatarSVG(charFormDraft, 110)}</div>
+    <div class="avatar-preview">${renderAvatarSVG(preview, 110)}</div>
     <input id="char-name-input" class="char-name-input" type="text" maxlength="8" placeholder="이름을 입력해주세요" value="${escapeHtml(charFormDraft.name)}" />
     <div class="swatch-group">
-      <p>성별</p>
-      <div class="gender-toggle">
-        <button class="gender-btn ${charFormDraft.gender === "girl" ? "active" : ""}" onclick="setDraftGender('girl')">👧 여자아이</button>
-        <button class="gender-btn ${charFormDraft.gender === "boy" ? "active" : ""}" onclick="setDraftGender('boy')">👦 남자아이</button>
-      </div>
+      <p>👧 여자아이</p>
+      <div class="preset-grid">${girls.map(presetTile).join("")}</div>
     </div>
     <div class="swatch-group">
-      <p>머리 색</p>
-      <div class="swatches">${CHARACTER_OPTIONS.hair
-        .map((c) => `<button class="swatch ${charFormDraft.hair === c ? "active" : ""}" style="background:${c}" onclick="setDraftHair('${c}')"></button>`)
-        .join("")}</div>
-    </div>
-    <div class="swatch-group">
-      <p>옷 색</p>
-      <div class="swatches">${CHARACTER_OPTIONS.outfit
-        .map((c) => `<button class="swatch ${charFormDraft.outfit === c ? "active" : ""}" style="background:${c}" onclick="setDraftOutfit('${c}')"></button>`)
-        .join("")}</div>
+      <p>👦 남자아이</p>
+      <div class="preset-grid">${boys.map(presetTile).join("")}</div>
     </div>
     <div class="action-row">
       <button class="action-btn" onclick="saveCharacterForm()">${editingCharacterId ? "수정 완료 ✅" : "만들기 ✨"}</button>
@@ -477,7 +475,7 @@ function characterFormHTML() {
 function openCharCreateForm() {
   charFormOpen = true;
   editingCharacterId = null;
-  charFormDraft = { name: "", gender: "girl", hair: CHARACTER_OPTIONS.hair[0], outfit: CHARACTER_OPTIONS.outfit[0] };
+  charFormDraft = { name: "", preset: null };
   renderActivityPanel();
 }
 
@@ -486,7 +484,7 @@ function startEditCharacter(id) {
   if (!c) return;
   charFormOpen = true;
   editingCharacterId = id;
-  charFormDraft = { name: c.name, gender: c.gender, hair: c.hair, outfit: c.outfit };
+  charFormDraft = { name: c.name, preset: c.preset };
   renderActivityPanel();
 }
 
@@ -501,19 +499,9 @@ function syncDraftName() {
   if (el) charFormDraft.name = el.value;
 }
 
-function setDraftGender(g) {
+function setDraftPreset(id) {
   syncDraftName();
-  charFormDraft.gender = g;
-  renderActivityPanel();
-}
-function setDraftHair(c) {
-  syncDraftName();
-  charFormDraft.hair = c;
-  renderActivityPanel();
-}
-function setDraftOutfit(c) {
-  syncDraftName();
-  charFormDraft.outfit = c;
+  charFormDraft.preset = id;
   renderActivityPanel();
 }
 
@@ -524,17 +512,22 @@ function saveCharacterForm() {
     toast("이름을 입력해주세요");
     return;
   }
+  if (!charFormDraft.preset) {
+    toast("캐릭터 모습을 골라주세요");
+    return;
+  }
+  const presetDef = CHARACTER_PRESETS.find((p) => p.id === charFormDraft.preset);
+  const gender = presetDef ? presetDef.gender : "girl";
   if (editingCharacterId) {
     const c = state.characters.find((x) => x.id === editingCharacterId);
     if (c) {
       c.name = name;
-      c.gender = charFormDraft.gender;
-      c.hair = charFormDraft.hair;
-      c.outfit = charFormDraft.outfit;
+      c.preset = charFormDraft.preset;
+      c.gender = gender;
     }
     toast(`${name} 정보를 수정했어요!`);
   } else {
-    const c = { id: uid(), name, gender: charFormDraft.gender, hair: charFormDraft.hair, outfit: charFormDraft.outfit };
+    const c = { id: uid(), name, preset: charFormDraft.preset, gender };
     state.characters.push(c);
     state.activeCharacterId = c.id;
     toast(`${name}을(를) 만들었어요! 🎉`);

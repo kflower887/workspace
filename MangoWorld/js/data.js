@@ -203,10 +203,18 @@ const MENUS = {
   ],
 };
 
-// 캐릭터 커스터마이징 옵션
-const CHARACTER_OPTIONS = {
-  hair: ["#3b2313", "#6b3f1d", "#1c1c1c", "#a45c2e", "#7a4a9a", "#d67ba0"],
-  outfit: ["#ff8fab", "#ffb703", "#8ecae6", "#8ac926", "#ffafcc", "#bde0fe"],
-};
+// 캐릭터 프리셋 (여자아이 5명 + 남자아이 5명, img/characters/{id}.webp)
+const CHARACTER_PRESETS = [
+  { id: "girl1", gender: "girl", label: "리본 원피스" },
+  { id: "girl2", gender: "girl", label: "웨이브 단발" },
+  { id: "girl3", gender: "girl", label: "양갈래 후드" },
+  { id: "girl4", gender: "girl", label: "단발머리" },
+  { id: "girl5", gender: "girl", label: "멜빵 원피스" },
+  { id: "boy1", gender: "boy", label: "멜빵바지" },
+  { id: "boy2", gender: "boy", label: "볼캡 스트라이프" },
+  { id: "boy3", gender: "boy", label: "후드티" },
+  { id: "boy4", gender: "boy", label: "점퍼룩" },
+  { id: "boy5", gender: "boy", label: "교복 조끼" },
+];
 
 const TAEKWONDO_BELTS = ["흰띠", "노란띠", "초록띠", "파란띠", "빨간띠", "검은띠"];
