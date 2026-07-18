@@ -10,12 +10,15 @@
 
 <div id="app">
 
-  <!-- 상단 바 -->
+  <!-- 상단 플로팅 컨트롤 (전체 폭 메뉴바 없이 좌/우에 따로 떠 있음) -->
   <header id="topbar">
-    <button id="btn-home" class="icon-btn" title="지도로">🗺️</button>
-    <div id="topbar-title">망고월드</div>
-    <div id="topbar-avatar"></div>
-    <div id="coin-display">🥭 <span id="coin-count">0</span></div>
+    <div id="topbar-left">
+      <button id="btn-home" class="icon-btn" title="지도로">🗺️</button>
+      <div id="topbar-avatar"></div>
+    </div>
+    <div id="coin-display" title="망고월렛">
+      🥭 <span class="wallet-label">망고월렛</span> <span id="coin-count">0</span>
+    </div>
   </header>
 
   <!-- 마을 지도 화면 -->

@@ -16,7 +16,7 @@ function defaultState() {
     if (it.starter) owned[it.id] = true;
   });
   return {
-    coins: 3000,
+    coins: 10000,
     savings: 0,
     characters: [],
     activeCharacterId: null,
