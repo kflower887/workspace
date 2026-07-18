@@ -87,6 +87,8 @@ const tabButtons = document.querySelectorAll(".tab-btn");
 const toastEl = document.getElementById("toast");
 const coinDisplayEl = document.getElementById("coin-display");
 const fxLayer = document.getElementById("fx-layer");
+const appEl = document.getElementById("app");
+const uiToggleBtn = document.getElementById("ui-toggle");
 
 // ---- 공용 UI 헬퍼 ----
 function toast(msg) {
@@ -185,11 +187,18 @@ function escapeHtml(s) {
 // ---- 마을 지도 ----
 function showMap() {
   currentLocation = null;
+  appEl.classList.remove("immersive");
   screenMap.classList.remove("hidden");
   screenLocation.classList.add("hidden");
   renderTownGrid();
   renderMapIntro();
   playScreenEnter(screenMap);
+}
+
+function toggleImmersive() {
+  const on = appEl.classList.toggle("immersive");
+  uiToggleBtn.textContent = on ? "⤢" : "⛶";
+  uiToggleBtn.title = on ? "화면 원래대로" : "화면 전체보기";
 }
 
 function renderMapIntro() {
@@ -247,6 +256,7 @@ function enterLocation(id) {
 }
 
 btnHome.addEventListener("click", showMap);
+uiToggleBtn.addEventListener("click", toggleImmersive);
 
 tabButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -261,6 +271,7 @@ tabButtons.forEach((btn) => {
 // ---- 방 꾸미기 (배치) ----
 function renderRoom() {
   const placedList = state.placed[currentLocation.id] || [];
+  const bg = roomBackgroundSVG(currentLocation.theme);
   const itemsHtml = placedList
     .map((p) => {
       const item = ITEMS.find((i) => i.id === p.itemId);
@@ -273,7 +284,7 @@ function renderRoom() {
   const hint = selectedItemId
     ? `<div class="room-hint active">✋ 놓을 위치를 탭하세요</div>`
     : `<div class="room-hint">보관함에서 아이템을 골라 배치해보세요</div>`;
-  roomCanvas.innerHTML = itemsHtml + hint;
+  roomCanvas.innerHTML = bg + itemsHtml + hint;
 }
 
 roomCanvas.addEventListener("click", (e) => {
