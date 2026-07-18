@@ -184,6 +184,12 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 }
 
+function itemVisualHtml(item, cls) {
+  return item.icon
+    ? `<img class="${cls} icon-img" src="img/items/${item.icon}.webp" alt="${escapeHtml(item.name)}" />`
+    : `<span class="${cls}">${item.emoji}</span>`;
+}
+
 // ---- 마을 지도 ----
 function showMap() {
   currentLocation = null;
@@ -276,7 +282,7 @@ function renderRoom() {
       const item = ITEMS.find((i) => i.id === p.itemId);
       if (!item) return "";
       return `<div class="placed-item" style="left:${p.x}%; top:${p.y}%;" onclick="event.stopPropagation(); requestRemovePlaced('${currentLocation.id}','${p.uid}', event.currentTarget)" title="탭해서 치우기">
-        <span class="placed-emoji">${item.emoji}</span>
+        ${itemVisualHtml(item, "placed-emoji")}
       </div>`;
     })
     .join("");
@@ -330,7 +336,7 @@ function renderInventoryTab() {
         .map(
           (it) => `
       <button class="item-chip ${selectedItemId === it.id ? "selected" : ""}" onclick="selectInvItem('${it.id}')">
-        <span class="chip-emoji">${it.emoji}</span><span class="chip-name">${it.name}</span>
+        ${itemVisualHtml(it, "chip-emoji")}<span class="chip-name">${it.name}</span>
       </button>`
         )
         .join("")
@@ -344,7 +350,7 @@ function renderShopTab() {
         .map((it) => {
           const owned = !!state.owned[it.id];
           return `<div class="item-chip shop ${owned ? "owned" : ""}">
-          <span class="chip-emoji">${it.emoji}</span>
+          ${itemVisualHtml(it, "chip-emoji")}
           <span class="chip-name">${it.name}</span>
           <span class="chip-price">${owned ? "보유중 ✓" : "🥭 " + it.price}</span>
           ${owned ? "" : `<button class="buy-btn" onclick="buyDecor('${it.id}')">구매</button>`}

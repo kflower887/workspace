@@ -247,6 +247,7 @@ html, body {
 }
 .placed-item:active { transform: translate(-50%, -50%) scale(0.85); }
 .placed-item.removing { animation: item-shrink-out 0.22s ease forwards; }
+.placed-item img.icon-img { width: 46px; height: 46px; object-fit: contain; display: block; pointer-events: none; }
 .room-hint {
   position: absolute;
   bottom: 8px;
@@ -309,6 +310,8 @@ html, body {
 .item-chip.shop { flex-direction: column; align-items: center; gap: 4px; cursor: default; min-width: 84px; }
 .item-chip.owned { opacity: 0.6; }
 .chip-emoji { font-size: 20px; }
+img.chip-emoji.icon-img { width: 28px; height: 28px; object-fit: contain; }
+.item-chip.shop img.chip-emoji.icon-img { width: 40px; height: 40px; }
 .chip-price { font-size: 11px; color: #a97a3d; }
 .buy-btn {
   border: none;
