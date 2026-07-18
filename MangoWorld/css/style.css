@@ -183,6 +183,8 @@ html, body {
   grid-template-rows: auto auto auto auto auto auto;
   gap: 12px;
 }
+/* 세로 모드에서는 레이아웃에 관여하지 않고 자식들을 그대로 그리드 아이템으로 노출 */
+#location-sidebar { display: contents; }
 .location-header { grid-area: header; }
 #loc-activity { grid-area: activity; }
 .room-wrap { grid-area: canvas; }
@@ -201,17 +203,9 @@ html, body {
   width: 100%;
   height: 240px;
   border-radius: var(--radius);
-  background: linear-gradient(180deg, var(--room-wall, #fff3d6) 0%, var(--room-wall, #fff3d6) 60%, var(--room-floor, #ffe9b8) 60%, var(--room-floor, #ffe9b8) 100%);
+  background: var(--cream) center / cover no-repeat;
   box-shadow: inset 0 0 0 3px #fff, var(--shadow-deep);
   overflow: hidden;
-}
-.room-bg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  z-index: 0;
 }
 
 .ui-toggle-btn {
@@ -231,16 +225,16 @@ html, body {
   box-shadow: var(--shadow);
   color: var(--ink);
 }
-.theme-home #room-canvas { --room-wall: #ffe6ef; --room-floor: #ffc9d9; }
-.theme-school #room-canvas { --room-wall: #e3f3fc; --room-floor: #bfe4f6; }
-.theme-cafe #room-canvas { --room-wall: #f3e3cf; --room-floor: #dcc3a0; }
-.theme-taekwondo #room-canvas { --room-wall: #e2f5e0; --room-floor: #b9e3b4; }
-.theme-playground #room-canvas { --room-wall: #fff2cf; --room-floor: #ffdd94; }
-.theme-piano #room-canvas { --room-wall: #ece3fb; --room-floor: #d3c1f5; }
-.theme-restaurant #room-canvas { --room-wall: #ffe3da; --room-floor: #ffbfae; }
-.theme-stationery #room-canvas { --room-wall: #dbf7f5; --room-floor: #aeeae6; }
-.theme-mart #room-canvas { --room-wall: #e3e4ff; --room-floor: #c2c4ff; }
-.theme-bank #room-canvas { --room-wall: #eaf1e2; --room-floor: #cfe0bd; }
+.theme-home #room-canvas { background-image: url('../img/rooms/home.jpg'); }
+.theme-school #room-canvas { background-image: url('../img/rooms/school.jpg'); }
+.theme-cafe #room-canvas { background-image: url('../img/rooms/cafe.jpg'); }
+.theme-taekwondo #room-canvas { background-image: url('../img/rooms/taekwondo.jpg'); }
+.theme-playground #room-canvas { background-image: url('../img/rooms/playground.jpg'); }
+.theme-piano #room-canvas { background-image: url('../img/rooms/piano.jpg'); }
+.theme-restaurant #room-canvas { background-image: url('../img/rooms/restaurant.jpg'); }
+.theme-stationery #room-canvas { background-image: url('../img/rooms/stationery.jpg'); }
+.theme-mart #room-canvas { background-image: url('../img/rooms/mart.jpg'); }
+.theme-bank #room-canvas { background-image: url('../img/rooms/bank.jpg'); }
 
 .placed-item {
   position: absolute;
@@ -674,40 +668,38 @@ html, body {
   #screen-location {
     height: 100%;
     grid-template-columns: 1.35fr 1fr;
-    grid-template-rows: auto auto auto minmax(0, 1fr);
-    grid-template-areas:
-      "canvas header"
-      "canvas activity"
-      "canvas tabs"
-      "canvas tabcontent";
+    grid-template-rows: 1fr;
+    grid-template-areas: "canvas sidebar";
     gap: 8px 14px;
     overflow: hidden;
   }
-  /* 보관함/상점 탭은 landscape에서 같은 영역을 공유하며 스크롤 (동시에 하나만 보임) */
-  #tab-inventory, #tab-shop { grid-area: tabcontent; overflow-y: auto; align-content: flex-start; }
+
+  /* 세로 모드와 달리 오른쪽 패널 전체를 하나의 스크롤 컬럼으로 묶어서
+     활동 패널이 길어져도 보관함/상점이 화면 밖으로 밀려나지 않게 함 */
+  #location-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    grid-area: sidebar;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  #tab-inventory, #tab-shop { flex-shrink: 0; }
 
   .room-wrap { min-height: 0; height: 100%; }
   #room-canvas { height: 100%; }
 
   .location-header h2 { font-size: 16px; }
   .location-header p { font-size: 11.5px; }
-  #loc-activity { overflow-y: auto; padding: 10px; max-height: 100%; }
+  #loc-activity { padding: 10px; }
   .panel { padding: 10px; }
 
   .ui-toggle-btn { display: flex; }
 
   /* 전체화면 게임플레이 모드: 상단바 + 오른쪽 패널을 숨기고 방 화면만 꽉 채움 */
   #app.immersive #topbar { display: none; }
-  #app.immersive #screen-location {
-    grid-template-columns: 1fr 0;
-  }
-  #app.immersive .location-header,
-  #app.immersive #loc-activity,
-  #app.immersive #room-tabs,
-  #app.immersive #tab-inventory,
-  #app.immersive #tab-shop {
-    display: none;
-  }
+  #app.immersive #screen-location { grid-template-columns: 1fr 0; }
+  #app.immersive #location-sidebar { display: none; }
 }
 
 @media (orientation: landscape) and (max-height: 420px) {

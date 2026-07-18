@@ -271,7 +271,6 @@ tabButtons.forEach((btn) => {
 // ---- 방 꾸미기 (배치) ----
 function renderRoom() {
   const placedList = state.placed[currentLocation.id] || [];
-  const bg = roomBackgroundSVG(currentLocation.theme);
   const itemsHtml = placedList
     .map((p) => {
       const item = ITEMS.find((i) => i.id === p.itemId);
@@ -284,7 +283,7 @@ function renderRoom() {
   const hint = selectedItemId
     ? `<div class="room-hint active">✋ 놓을 위치를 탭하세요</div>`
     : `<div class="room-hint">보관함에서 아이템을 골라 배치해보세요</div>`;
-  roomCanvas.innerHTML = bg + itemsHtml + hint;
+  roomCanvas.innerHTML = itemsHtml + hint;
 }
 
 roomCanvas.addEventListener("click", (e) => {

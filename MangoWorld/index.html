@@ -29,25 +29,27 @@
 
   <!-- 장소 화면 (동적으로 채워짐) -->
   <main id="screen-location" class="screen hidden">
-    <section class="location-header">
-      <h2 id="loc-title"></h2>
-      <p id="loc-desc"></p>
-    </section>
-
-    <section id="loc-activity" class="panel hidden"></section>
-
     <section class="room-wrap">
       <div id="room-canvas"></div>
       <button id="ui-toggle" class="ui-toggle-btn" title="화면 전체보기">⛶</button>
     </section>
 
-    <nav id="room-tabs">
-      <button class="tab-btn active" data-tab="inventory">🎒 보관함</button>
-      <button class="tab-btn" data-tab="shop">🛍️ 상점</button>
-    </nav>
+    <div id="location-sidebar">
+      <section class="location-header">
+        <h2 id="loc-title"></h2>
+        <p id="loc-desc"></p>
+      </section>
 
-    <section id="tab-inventory" class="tab-panel"></section>
-    <section id="tab-shop" class="tab-panel hidden"></section>
+      <section id="loc-activity" class="panel hidden"></section>
+
+      <nav id="room-tabs">
+        <button class="tab-btn active" data-tab="inventory">🎒 보관함</button>
+        <button class="tab-btn" data-tab="shop">🛍️ 상점</button>
+      </nav>
+
+      <section id="tab-inventory" class="tab-panel"></section>
+      <section id="tab-shop" class="tab-panel hidden"></section>
+    </div>
   </main>
 
   <div id="fx-layer"></div>
@@ -57,7 +59,6 @@
 
 <script src="js/data.js"></script>
 <script src="js/avatar.js"></script>
-<script src="js/scenery.js"></script>
 <script src="js/game.js"></script>
 </body>
 </html>
