@@ -1009,8 +1009,8 @@ function havingFun(name) {
 
 function bankHTML() {
   return `<div class="activity-box bank-box">
-    <p>지갑: 🥭 ${state.coins} &nbsp;|&nbsp; 저금통: 🥭 ${state.savings}</p>
-    ${state.savings > 0 ? `<p class="interest-note">📈 저금통은 1초마다 🥭 100씩 저절로 불어나요!</p>` : ""}
+    <p id="bank-balance-text">지갑: 🥭 ${state.coins} &nbsp;|&nbsp; 저금통: 🥭 ${state.savings}</p>
+    <p class="interest-note" id="bank-interest-note" style="${state.savings > 0 ? "" : "display:none;"}">📈 저금통은 5초마다 🥭 100씩 저절로 불어나요!</p>
     <div class="action-row">
       <button class="action-btn" onclick="claimAllowance()">${state.daily.allowanceClaimed ? "오늘 용돈 받음 ✓" : "💌 오늘의 용돈 받기 (+500)"}</button>
     </div>
@@ -1022,6 +1022,9 @@ function bankHTML() {
   </div>`;
 }
 
+const INTEREST_TICK_MS = 5000;
+const INTEREST_AMOUNT = 100;
+
 function accrueSavingsInterest() {
   const now = Date.now();
   if (!state.savingsUpdatedAt) state.savingsUpdatedAt = now;
@@ -1029,19 +1032,28 @@ function accrueSavingsInterest() {
     state.savingsUpdatedAt = now;
     return false;
   }
-  const elapsedSec = Math.floor((now - state.savingsUpdatedAt) / 1000);
-  if (elapsedSec <= 0) return false;
-  state.savings += elapsedSec * 100;
-  state.savingsUpdatedAt += elapsedSec * 1000;
+  const elapsedTicks = Math.floor((now - state.savingsUpdatedAt) / INTEREST_TICK_MS);
+  if (elapsedTicks <= 0) return false;
+  state.savings += elapsedTicks * INTEREST_AMOUNT;
+  state.savingsUpdatedAt += elapsedTicks * INTEREST_TICK_MS;
   save();
   return true;
 }
 
+// 은행 화면이 떠 있는 동안은 패널 전체를 다시 그리지 않고 잔액 텍스트만
+// 갱신합니다. (전체 재렌더링을 하면 저금/출금 입력창(#bank-amount)이
+// 매번 새로 만들어지면서 사용자가 입력 중이던 금액이 사라지는 버그가 있었음)
+function updateBankLiveDisplay() {
+  if (!currentLocation || currentLocation.id !== "bank") return;
+  const balanceEl = document.getElementById("bank-balance-text");
+  if (balanceEl) balanceEl.textContent = `지갑: 🥭 ${state.coins}  |  저금통: 🥭 ${state.savings}`;
+  const noteEl = document.getElementById("bank-interest-note");
+  if (noteEl) noteEl.style.display = state.savings > 0 ? "" : "none";
+}
+
 setInterval(() => {
   const changed = accrueSavingsInterest();
-  if (changed) {
-    if (currentLocation && currentLocation.id === "bank") renderActivityPanel();
-  }
+  if (changed) updateBankLiveDisplay();
 }, 1000);
 
 function claimAllowance() {
