@@ -123,11 +123,26 @@ html, body {
   background: transparent;
   cursor: pointer;
   padding: 0;
+  z-index: 2;
   transition: transform 0.12s ease;
   opacity: 0;
   animation: map-hotspot-in 0.4s cubic-bezier(.34,1.56,.64,1) forwards;
 }
 .map-hotspot:active { transform: translate(-50%, -50%) scale(0.9); }
+.map-tree-spot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border: none;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.32), rgba(255,255,255,0) 70%);
+  cursor: pointer;
+  padding: 0;
+  z-index: 1;
+  opacity: 0;
+  animation: map-hotspot-in 0.4s cubic-bezier(.34,1.56,.64,1) forwards;
+  transition: transform 0.12s ease;
+}
+.map-tree-spot:active { transform: translate(-50%, -50%) scale(0.8); }
 .map-caption {
   position: absolute;
   left: 50%;

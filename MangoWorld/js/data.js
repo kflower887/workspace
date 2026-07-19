@@ -9,7 +9,7 @@ const LOCATIONS = [
     theme: "home",
     desc: "당정동 행복빌라 302호, 우리 가족의 아늑한 우리집이에요.",
     hasWardrobe: true,
-    mapPos: { x: 47.8, y: 23.4, w: 19.1, h: 31.2 },
+    mapPos: { x: 47.5, y: 21.8, w: 17.9, h: 33.7 },
   },
   {
     id: "school",
@@ -17,7 +17,7 @@ const LOCATIONS = [
     emoji: "🏫",
     theme: "school",
     desc: "당정초등학교 2학년 3반 교실이에요. 여기서 공부하고 놀아요.",
-    mapPos: { x: 14.3, y: 32.6, w: 19.1, h: 33.9 },
+    mapPos: { x: 14.1, y: 29.8, w: 15.0, h: 33.7 },
   },
   {
     id: "cafe",
@@ -26,7 +26,7 @@ const LOCATIONS = [
     theme: "cafe",
     desc: "셀프 키오스크로 주문하는 당정동 무인카페예요.",
     menu: true,
-    mapPos: { x: 7.0, y: 61.2, w: 17.6, h: 33.9 },
+    mapPos: { x: 7.1, y: 59.5, w: 12.9, h: 25.8 },
   },
   {
     id: "taekwondo",
@@ -35,7 +35,7 @@ const LOCATIONS = [
     theme: "taekwondo",
     desc: "얍! 기합소리 가득한 군포 태권도학원이에요.",
     activity: "taekwondo",
-    mapPos: { x: 25.4, y: 62.5, w: 19.1, h: 33.9 },
+    mapPos: { x: 25.4, y: 58.5, w: 15.0, h: 35.7 },
   },
   {
     id: "playground",
@@ -44,7 +44,7 @@ const LOCATIONS = [
     theme: "playground",
     desc: "친구들과 뛰노는 아파트 단지 놀이터예요.",
     activity: "playground",
-    mapPos: { x: 13.2, y: 85.3, w: 22.1, h: 31.2 },
+    mapPos: { x: 8.5, y: 84.3, w: 16.0, h: 23.8 },
   },
   {
     id: "piano",
@@ -53,7 +53,7 @@ const LOCATIONS = [
     theme: "piano",
     desc: "도레미파솔라시도~ 피아노학원이에요.",
     activity: "piano",
-    mapPos: { x: 50.0, y: 86.6, w: 19.1, h: 31.2 },
+    mapPos: { x: 50.8, y: 76.4, w: 15.0, h: 29.8 },
   },
   {
     id: "restaurant",
@@ -62,7 +62,7 @@ const LOCATIONS = [
     theme: "restaurant",
     desc: "떡볶이부터 라면까지! 군포 분식&식당이에요.",
     menu: true,
-    mapPos: { x: 86.0, y: 85.9, w: 19.1, h: 28.6 },
+    mapPos: { x: 86.5, y: 82.3, w: 18.3, h: 30.8 },
   },
   {
     id: "stationery",
@@ -70,7 +70,7 @@ const LOCATIONS = [
     emoji: "✏️",
     theme: "stationery",
     desc: "갖고싶은 문구가 가득한 동네 문구점이에요.",
-    mapPos: { x: 90.1, y: 57.3, w: 19.1, h: 33.9 },
+    mapPos: { x: 92.6, y: 53.1, w: 13.6, h: 28.8 },
   },
   {
     id: "mart",
@@ -79,7 +79,7 @@ const LOCATIONS = [
     theme: "mart",
     desc: "필요한 건 다 있는 군포 동네 마트예요.",
     menu: true,
-    mapPos: { x: 68.4, y: 31.2, w: 19.1, h: 31.2 },
+    mapPos: { x: 68.1, y: 27.8, w: 13.2, h: 29.8 },
   },
   {
     id: "bank",
@@ -88,7 +88,7 @@ const LOCATIONS = [
     theme: "bank",
     desc: "용돈을 저금하고 찾을 수 있는 군포 은행이에요.",
     activity: "bank",
-    mapPos: { x: 73.5, y: 57.3, w: 17.6, h: 33.9 },
+    mapPos: { x: 77.5, y: 52.6, w: 14.1, h: 29.8 },
   },
 ];
 
@@ -233,6 +233,22 @@ const CHARACTER_PRESETS = [
 ];
 
 const TAEKWONDO_BELTS = ["흰띠", "노란띠", "초록띠", "파란띠", "빨간띠", "검은띠"];
+
+// 마을 지도 위 망고나무 (탭하면 망고코인 50 획득, 전부 % 좌표)
+const MANGO_TREES = [
+  { x: 2.6, y: 18.8 },
+  { x: 26.8, y: 14.9 },
+  { x: 28.7, y: 25.8 },
+  { x: 53.6, y: 14.9 },
+  { x: 83.6, y: 17.9 },
+  { x: 83.6, y: 29.8 },
+  { x: 93.0, y: 14.9 },
+  { x: 61.1, y: 60.5 },
+  { x: 65.8, y: 46.6 },
+  { x: 82.2, y: 51.6 },
+  { x: 22.6, y: 77.4 },
+  { x: 96.3, y: 64.5 },
+];
 
 // 캐릭터 꾸미기 액세서리 (이모지 오버레이)
 const ACCESSORY_OPTIONS = [

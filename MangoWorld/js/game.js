@@ -81,6 +81,7 @@ const coinCountEl = document.getElementById("coin-count");
 const screenMap = document.getElementById("screen-map");
 const screenLocation = document.getElementById("screen-location");
 const mapHotspots = document.getElementById("map-hotspots");
+const mapTrees = document.getElementById("map-trees");
 const mapLead = document.getElementById("map-lead");
 const locTitle = document.getElementById("loc-title");
 const locDesc = document.getElementById("loc-desc");
@@ -236,14 +237,33 @@ function renderMapHotspots() {
   mapHotspots.innerHTML = LOCATIONS.map((loc, idx) => {
     return `<button class="map-hotspot" data-loc-id="${loc.id}" style="animation-delay:${idx * 0.04}s;" onclick="enterLocation('${loc.id}')" title="${loc.name}" aria-label="${loc.name}"></button>`;
   }).join("");
+  renderMangoTrees();
   requestAnimationFrame(positionMapHotspots);
+}
+
+function renderMangoTrees() {
+  if (!mapTrees) return;
+  mapTrees.innerHTML = MANGO_TREES.map(
+    (t, idx) =>
+      `<button class="map-tree-spot" data-tree-idx="${idx}" style="animation-delay:${idx * 0.03}s;" onclick="clickMangoTree(event, ${idx})" title="망고나무" aria-label="망고나무 탭해서 코인 받기"></button>`
+  ).join("");
+}
+
+function clickMangoTree(e, idx) {
+  const el = e.currentTarget;
+  state.coins += 50;
+  save();
+  updateCoinDisplay();
+  floatCoinPopup(50);
+  bounce(el);
+  spawnSparkles(el);
 }
 
 // 지도 이미지는 background-size:contain으로 표시되므로(가로/세로 어느 화면비에서도
 // 잘리지 않게), 핫스팟 좌표도 실제로 그려지는 이미지 영역(letterbox 제외)을
 // 계산해서 픽셀 단위로 맞춰줘야 정확히 건물 위에 위치합니다.
 const MAP_IMG_W = 1400;
-const MAP_IMG_H = 791;
+const MAP_IMG_H = 663;
 
 function positionMapHotspots() {
   const canvas = document.getElementById("map-canvas");
@@ -270,6 +290,15 @@ function positionMapHotspots() {
     el.style.top = offsetY + (p.y / 100) * renderH + "px";
     el.style.width = (p.w / 100) * renderW + "px";
     el.style.height = (p.h / 100) * renderH + "px";
+  });
+  const treeSize = renderW * 0.09;
+  document.querySelectorAll(".map-tree-spot").forEach((el) => {
+    const t = MANGO_TREES[Number(el.dataset.treeIdx)];
+    if (!t) return;
+    el.style.left = offsetX + (t.x / 100) * renderW + "px";
+    el.style.top = offsetY + (t.y / 100) * renderH + "px";
+    el.style.width = treeSize + "px";
+    el.style.height = treeSize + "px";
   });
 }
 
